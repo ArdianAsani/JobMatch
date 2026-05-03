@@ -13,11 +13,11 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
             detail="Email is already registered",
         )
 
-    role = role_repository.get_role_by_name(db, data.role_name.upper())
+    role = role_repository.get_role_by_name(db, data.role_name)
     if not role:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail=f"Role '{data.role_name}' does not exist. Valid roles: ADMIN, COMPANY, CANDIDATE",
+            detail=f"Role '{data.role_name}' does not exist",
         )
 
     user = user_repository.create_user(

@@ -1,0 +1,253 @@
+import { useState } from 'react'
+import { Link, useNavigate } from 'react-router-dom'
+import AuthLayout from '../components/auth/AuthLayout'
+import axiosInstance from '../api/axiosInstance'
+import { validateRegisterForm, hasErrors } from '../utils/validation'
+
+function PersonIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+    </svg>
+  )
+}
+
+function EnvelopeIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 8l7.89 5.26a2 2 0 002.22 0L21 8M5 19h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
+    </svg>
+  )
+}
+
+function LockIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+    </svg>
+  )
+}
+
+function BuildingIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+    </svg>
+  )
+}
+
+function Field({ label, icon, type, placeholder, value, onChange, error }) {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+      <div className={`flex items-center gap-3 border rounded-lg px-4 py-3 focus-within:border-indigo-400 transition-colors ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+        {icon}
+        <input
+          type={type}
+          placeholder={placeholder}
+          className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+          value={value}
+          onChange={onChange}
+        />
+      </div>
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  )
+}
+
+const roles = [
+  {
+    key: 'CANDIDATE',
+    title: 'Job Seeker / Candidate',
+    desc: 'Find jobs, track applications, and connect with companies.',
+    icon: (
+      <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
+      </svg>
+    ),
+  },
+  {
+    key: 'COMPANY',
+    title: 'Employer / Company',
+    desc: 'Post jobs, manage applicants, and hire top talent faster.',
+    icon: (
+      <svg className="w-5 h-5 text-indigo-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 21V5a2 2 0 00-2-2H7a2 2 0 00-2 2v16m14 0h2m-2 0h-5m-9 0H3m2 0h5M9 7h1m-1 4h1m4-4h1m-1 4h1m-5 10v-5a1 1 0 011-1h2a1 1 0 011 1v5m-4 0h4" />
+      </svg>
+    ),
+  },
+]
+
+const initialForm = { firstName: '', lastName: '', companyName: '', email: '', password: '' }
+
+export default function Register() {
+  const [step, setStep] = useState(1)
+  const [role, setRole] = useState(null)
+  const [form, setForm] = useState(initialForm)
+  const [fieldErrors, setFieldErrors] = useState({})
+  const [serverError, setServerError] = useState('')
+  const [loading, setLoading] = useState(false)
+  const navigate = useNavigate()
+
+  const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
+
+  const handleSubmit = async (e) => {
+    e.preventDefault()
+    setServerError('')
+
+    const errors = validateRegisterForm(form, role)
+    if (hasErrors(errors)) {
+      setFieldErrors(errors)
+      return
+    }
+    setFieldErrors({})
+    setLoading(true)
+
+    try {
+      await axiosInstance.post('/auth/register', {
+        first_name: role === 'COMPANY' ? form.companyName : form.firstName,
+        last_name: role === 'COMPANY' ? '' : form.lastName,
+        email: form.email,
+        password: form.password,
+        role_name: role,
+      })
+      navigate('/login')
+    } catch (err) {
+      setServerError(err.response?.data?.detail || 'Registration failed. Please try again.')
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  return (
+    <AuthLayout title="Create your account">
+      {/* Progress bar */}
+      <div className="flex gap-2 mb-5">
+        <div className="h-1 flex-1 rounded-full bg-indigo-600" />
+        <div className={`h-1 flex-1 rounded-full transition-colors ${step === 2 ? 'bg-indigo-600' : 'bg-gray-200'}`} />
+      </div>
+
+      <div className="bg-white rounded-2xl shadow-sm p-8">
+        {step === 1 ? (
+          <>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">I am a...</h2>
+            <p className="text-sm text-gray-500 mb-6">Choose your role to get started.</p>
+
+            <div className="space-y-3 mb-6">
+              {roles.map(r => (
+                <button
+                  key={r.key}
+                  type="button"
+                  onClick={() => setRole(r.key)}
+                  className={`w-full flex items-center gap-4 p-4 rounded-xl border-2 text-left transition-all ${
+                    role === r.key
+                      ? 'border-indigo-600 bg-indigo-50'
+                      : 'border-gray-200 hover:border-indigo-300 hover:bg-gray-50'
+                  }`}
+                >
+                  <div className="w-10 h-10 bg-indigo-50 rounded-xl flex items-center justify-center shrink-0">
+                    {r.icon}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 text-sm">{r.title}</div>
+                    <div className="text-xs text-indigo-500 mt-0.5">{r.desc}</div>
+                  </div>
+                </button>
+              ))}
+            </div>
+
+            <button
+              type="button"
+              disabled={!role}
+              onClick={() => setStep(2)}
+              className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+            >
+              Continue →
+            </button>
+          </>
+        ) : (
+          <>
+            <h2 className="text-lg font-bold text-gray-900 mb-1">
+              {role === 'COMPANY' ? 'Company details' : 'Your details'}
+            </h2>
+            <p className="text-sm text-gray-500 mb-6">Fill in your information to get started.</p>
+
+            {serverError && (
+              <div className="mb-4 bg-red-50 border border-red-200 text-red-600 text-sm rounded-lg px-4 py-3">
+                {serverError}
+              </div>
+            )}
+
+            <form onSubmit={handleSubmit} noValidate>
+              {role === 'COMPANY' ? (
+                <Field
+                  label="Company Name"
+                  icon={<BuildingIcon />}
+                  type="text"
+                  placeholder="e.g. TechCorp Inc."
+                  value={form.companyName}
+                  onChange={setField('companyName')}
+                  error={fieldErrors.companyName}
+                />
+              ) : (
+                <>
+                  <Field
+                    label="First Name"
+                    icon={<PersonIcon />}
+                    type="text"
+                    placeholder="e.g. Sarah"
+                    value={form.firstName}
+                    onChange={setField('firstName')}
+                    error={fieldErrors.firstName}
+                  />
+                  <Field
+                    label="Last Name"
+                    icon={<PersonIcon />}
+                    type="text"
+                    placeholder="e.g. Johnson"
+                    value={form.lastName}
+                    onChange={setField('lastName')}
+                    error={fieldErrors.lastName}
+                  />
+                </>
+              )}
+              <Field
+                label="Email address"
+                icon={<EnvelopeIcon />}
+                type="email"
+                placeholder="you@example.com"
+                value={form.email}
+                onChange={setField('email')}
+                error={fieldErrors.email}
+              />
+              <Field
+                label="Password"
+                icon={<LockIcon />}
+                type="password"
+                placeholder="Min. 8 characters"
+                value={form.password}
+                onChange={setField('password')}
+                error={fieldErrors.password}
+              />
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full bg-indigo-600 text-white py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors mt-2 disabled:opacity-60 disabled:cursor-not-allowed"
+              >
+                {loading ? 'Creating account...' : 'Create Account →'}
+              </button>
+            </form>
+          </>
+        )}
+      </div>
+
+      <p className="mt-6 text-sm text-gray-500 text-center">
+        Already have an account?{' '}
+        <Link to="/login" className="text-indigo-600 font-semibold hover:underline">
+          Sign in
+        </Link>
+      </p>
+    </AuthLayout>
+  )
+}

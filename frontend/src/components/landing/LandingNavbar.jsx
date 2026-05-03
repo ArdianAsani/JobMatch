@@ -43,12 +43,12 @@ export default function LandingNavbar() {
         </div>
 
         <div className="flex items-center gap-4">
-          <a href="#" className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors">
+          <Link to="/login" className="text-gray-600 hover:text-gray-900 font-medium text-sm transition-colors">
             Sign In
-          </a>
-          <button className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors">
+          </Link>
+          <Link to="/register" className="bg-indigo-600 text-white px-5 py-2 rounded-lg font-semibold text-sm hover:bg-indigo-700 transition-colors">
             Get Started
-          </button>
+          </Link>
         </div>
       </div>
     </nav>
