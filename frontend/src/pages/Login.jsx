@@ -3,7 +3,7 @@ import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout'
 import axiosInstance from '../api/axiosInstance'
 import { validateLoginForm, hasErrors } from '../utils/validation'
-import { getDashboardPath } from '../utils/auth'
+import { getDashboardPath, storeAuthTokens } from '../utils/auth'
 
 function EnvelopeIcon() {
   return (
@@ -62,8 +62,7 @@ export default function Login() {
 
     try {
       const { data } = await axiosInstance.post('/auth/login', { email, password })
-      localStorage.setItem('access_token', data.access_token)
-      localStorage.setItem('role', data.role)
+      storeAuthTokens(data)
       navigate(getDashboardPath(data.role))
     } catch (err) {
       setServerError(err.response?.data?.detail || 'Invalid email or password.')

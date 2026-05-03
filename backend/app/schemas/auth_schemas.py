@@ -39,6 +39,14 @@ class LoginSchema(BaseModel):
     password: str
 
 
+class RefreshRequestSchema(BaseModel):
+    refresh_token: str
+
+
+class LogoutRequestSchema(BaseModel):
+    refresh_token: str
+
+
 class UserResponseSchema(BaseModel):
     id: int
     first_name: str
@@ -53,5 +61,15 @@ class UserResponseSchema(BaseModel):
 
 class TokenResponseSchema(BaseModel):
     access_token: str
+    refresh_token: str
     token_type: str
     role: str
+
+
+class AccessTokenResponseSchema(BaseModel):
+    access_token: str
+    token_type: str
+
+
+class MessageSchema(BaseModel):
+    message: str

@@ -1,9 +1,15 @@
+from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
-from app.repositories import role_repository, user_repository
+from app.repositories import role_repository, user_repository, refresh_token_repository
 from app.schemas.auth_schemas import RegisterSchema, LoginSchema
 from app.utils.password_utils import hash_password, verify_password
 from app.utils.token_utils import create_access_token
+from app.utils.refresh_token_utils import (
+    generate_refresh_token,
+    hash_refresh_token,
+    get_refresh_token_expiry,
+)
 
 
 def register_user(db: Session, data: RegisterSchema) -> dict:
@@ -43,7 +49,7 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
 def login_user(db: Session, data: LoginSchema) -> dict:
     user = user_repository.get_user_by_email(db, data.email)
 
-    # Use a generic message to avoid leaking whether the email exists
+    # Generic message to avoid leaking whether the email exists
     if not user or not verify_password(data.password, user.password_hash):
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED,
@@ -56,13 +62,71 @@ def login_user(db: Session, data: LoginSchema) -> dict:
             detail="Account is inactive",
         )
 
-    token = create_access_token({"sub": str(user.id), "role": user.role.name})
+    access_token = create_access_token({"sub": str(user.id), "role": user.role.name})
+
+    raw_refresh_token = generate_refresh_token()
+    refresh_token_repository.create_refresh_token(
+        db=db,
+        user_id=user.id,
+        token_hash=hash_refresh_token(raw_refresh_token),
+        expires_at=get_refresh_token_expiry(),
+    )
 
     return {
-        "access_token": token,
+        "access_token": access_token,
+        "refresh_token": raw_refresh_token,
         "token_type": "bearer",
         "role": user.role.name,
     }
+
+
+def refresh_access_token(db: Session, raw_token: str) -> dict:
+    token_hash = hash_refresh_token(raw_token)
+    stored = refresh_token_repository.get_by_hash(db, token_hash)
+
+    if not stored:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid refresh token",
+        )
+
+    if stored.revoked_at is not None:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has been revoked",
+        )
+
+    now = datetime.now(timezone.utc)
+    expires_at = stored.expires_at
+    if expires_at.tzinfo is None:
+        expires_at = expires_at.replace(tzinfo=timezone.utc)
+
+    if now > expires_at:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Refresh token has expired",
+        )
+
+    user = user_repository.get_user_by_id(db, stored.user_id)
+    if not user or not user.is_active:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Account is inactive",
+        )
+
+    new_access_token = create_access_token({"sub": str(user.id), "role": user.role.name})
+
+    return {"access_token": new_access_token, "token_type": "bearer"}
+
+
+def logout_user(db: Session, raw_token: str) -> dict:
+    token_hash = hash_refresh_token(raw_token)
+    stored = refresh_token_repository.get_by_hash(db, token_hash)
+
+    if stored and stored.revoked_at is None:
+        refresh_token_repository.revoke(db, stored)
+
+    return {"message": "Logged out successfully"}
 
 
 def get_current_user_profile(db: Session, user_id: int) -> dict:

@@ -2,7 +2,16 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from fastapi.security import OAuth2PasswordBearer, OAuth2PasswordRequestForm
 from sqlalchemy.orm import Session
 from app.database import get_db
-from app.schemas.auth_schemas import RegisterSchema, LoginSchema, UserResponseSchema, TokenResponseSchema
+from app.schemas.auth_schemas import (
+    RegisterSchema,
+    LoginSchema,
+    RefreshRequestSchema,
+    LogoutRequestSchema,
+    UserResponseSchema,
+    TokenResponseSchema,
+    AccessTokenResponseSchema,
+    MessageSchema,
+)
 from app.services import auth_service
 from app.utils.token_utils import verify_access_token
 
@@ -39,6 +48,18 @@ def token(form: OAuth2PasswordRequestForm = Depends(), db: Session = Depends(get
     """Swagger OAuth2 login — accepts form-data; username field is treated as email."""
     data = LoginSchema(email=form.username, password=form.password)
     return auth_service.login_user(db, data)
+
+
+@router.post("/refresh", response_model=AccessTokenResponseSchema)
+def refresh(data: RefreshRequestSchema, db: Session = Depends(get_db)):
+    """Issue a new access token using a valid refresh token."""
+    return auth_service.refresh_access_token(db, data.refresh_token)
+
+
+@router.post("/logout", response_model=MessageSchema)
+def logout(data: LogoutRequestSchema, db: Session = Depends(get_db)):
+    """Revoke a refresh token and invalidate the session."""
+    return auth_service.logout_user(db, data.refresh_token)
 
 
 @router.get("/me", response_model=UserResponseSchema)
