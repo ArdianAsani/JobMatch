@@ -1,8 +1,15 @@
+import { BrowserRouter, Routes, Route } from 'react-router-dom'
+import Landing from './pages/Landing'
+import About from './pages/About'
+
 function App() {
   return (
-    <h1 className="text-4xl text-blue-500 font-bold">
-      Tailwind Working
-    </h1>
+    <BrowserRouter>
+      <Routes>
+        <Route path="/" element={<Landing />} />
+        <Route path="/about" element={<About />} />
+      </Routes>
+    </BrowserRouter>
   )
 }
 
