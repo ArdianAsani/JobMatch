@@ -1,4 +1,9 @@
-# Import models here so SQLAlchemy registers them with Base before create_all() is called
-from app.models.role import Role
-from app.models.user import User
-from app.models.refresh_token import RefreshToken
+from .role import Role
+from .user import User
+from .refresh_token import RefreshToken
+from .job_listing import JobListing
+from .application import Application
+from .ml_match_result import MLMatchResult
+from .candidate_profile import CandidateProfile
+from .company_profile import CompanyProfile
+from app.models.file import File
