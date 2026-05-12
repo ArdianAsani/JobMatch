@@ -1,26 +1,33 @@
 import axios from 'axios'
 import { getToken, getRefreshToken, clearAuthTokens } from '../utils/auth'
 
-const BASE_URL = import.meta.env.VITE_API_URL
+const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
+
+console.log('🚀 API Base URL është:', BASE_URL)   // Kjo duhet të shfaqet
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
+  timeout: 15000,
+  headers: {
+    'Content-Type': 'application/json',
+  }
 })
 
-// Attach access token to every request
+// Request interceptor
 axiosInstance.interceptors.request.use(config => {
   const token = getToken()
-  if (token) config.headers.Authorization = `Bearer ${token}`
+  if (token) {
+    config.headers.Authorization = `Bearer ${token}`
+  }
   return config
 })
 
-// On 401: try to refresh once, then retry the original request
+// Response interceptor (mbaje siç e ke)
 axiosInstance.interceptors.response.use(
   response => response,
   async error => {
     const original = error.config
 
-    // Only handle 401s, and only attempt one refresh per request
     if (error.response?.status !== 401 || original._retried) {
       return Promise.reject(error)
     }
@@ -35,7 +42,6 @@ axiosInstance.interceptors.response.use(
     }
 
     try {
-      // Use plain axios (not axiosInstance) to avoid triggering this interceptor again
       const { data } = await axios.post(`${BASE_URL}/auth/refresh`, {
         refresh_token: refreshToken,
       })
