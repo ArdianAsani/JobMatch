@@ -32,6 +32,19 @@ def get_current_user_id(token: str = Depends(oauth2_scheme)) -> int:
     return int(payload["sub"])
 
 
+def get_current_user_info(token: str = Depends(oauth2_scheme)) -> dict:
+    """Returns {"user_id": int, "role": str} extracted from the JWT.
+    Used by dashboard routes that need both identity and role for authorization."""
+    payload = verify_access_token(token)
+    if not payload:
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired token",
+            headers={"WWW-Authenticate": "Bearer"},
+        )
+    return {"user_id": int(payload["sub"]), "role": payload.get("role", "")}
+
+
 @router.post("/register", response_model=UserResponseSchema, status_code=status.HTTP_201_CREATED)
 def register(data: RegisterSchema, db: Session = Depends(get_db)):
     return auth_service.register_user(db, data)

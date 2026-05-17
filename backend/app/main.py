@@ -3,8 +3,8 @@ from fastapi.middleware.cors import CORSMiddleware
 from app.database import engine, Base, SessionLocal
 from app.models import Role, User  # noqa: F401 — registers models with Base
 from app.routes.auth_routes import router as auth_router
-# SHTO KËTË IMPORT
-from app.routes.dashboards import router as dashboard_router 
+from app.routes.dashboards import router as dashboard_router
+from app.routes.admin_routes import router as admin_router
 from app.repositories import role_repository
 
 app = FastAPI(title="JobMatch API")
@@ -44,8 +44,8 @@ seed_roles()
 
 # Routers
 app.include_router(auth_router)
-# SHTO KËTË LINJË PËR DASHBOARD-ET
 app.include_router(dashboard_router)
+app.include_router(admin_router)
 
 
 @app.get("/")

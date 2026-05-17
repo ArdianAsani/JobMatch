@@ -1,67 +1,75 @@
 import React, { useState, useEffect } from 'react';
-import axios from 'axios';
+import { jwtDecode } from 'jwt-decode';
 import { Layout, Briefcase, Users, Plus, X, Globe, MapPin, Trash2, Edit3, Check, Ban } from 'lucide-react';
+import axiosInstance from '../api/axiosInstance';
+import { getToken, logout } from '../utils/auth';
 
 const CompanyDashboard = () => {
   const [listings, setListings] = useState([]);
   const [applicants, setApplicants] = useState([]);
   const [companyInfo, setCompanyInfo] = useState(null);
   const [showModal, setShowModal] = useState(false);
-  const [editingJob, setEditingJob] = useState(null); // Ruhet puna që po modifikohet
+  const [editingJob, setEditingJob] = useState(null);
   const [selectedApp, setSelectedApp] = useState(null);
-  
   const [jobForm, setJobForm] = useState({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' });
-  const companyUserId = 1; 
+
+  // Decode the logged-in user's ID from the JWT — never hardcoded
+  const userId = jwtDecode(getToken()).sub;
 
   const fetchData = async () => {
     try {
-      const res = await axios.get(`http://localhost:8000/api/dashboard/company/${companyUserId}`);
+      const res = await axiosInstance.get(`/api/dashboard/company/${userId}`);
       setListings(res.data.my_listings);
       setCompanyInfo(res.data.company_info);
-      const resApp = await axios.get(`http://localhost:8000/api/dashboard/company/${companyUserId}/applicants`);
+
+      const resApp = await axiosInstance.get(`/api/dashboard/company/${userId}/applicants`);
       setApplicants(resApp.data);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   useEffect(() => { fetchData(); }, []);
 
-  // CREATE ose UPDATE Job
   const handleSubmitJob = async (e) => {
     e.preventDefault();
     try {
       if (editingJob) {
-        // UPDATE
-        await axios.put(`http://localhost:8000/api/dashboard/jobs/update/${editingJob.id}`, jobForm);
-        alert("Opportunity updated!");
+        await axiosInstance.put(`/api/dashboard/jobs/update/${editingJob.id}`, jobForm);
+        alert('Opportunity updated!');
       } else {
-        // CREATE
-        await axios.post('http://localhost:8000/api/dashboard/jobs/create', { ...jobForm, company_id: companyInfo.id });
-        alert("Opportunity published!");
+        // company_id is no longer sent — backend derives it from the JWT
+        await axiosInstance.post('/api/dashboard/jobs/create', jobForm);
+        alert('Opportunity published!');
       }
       setShowModal(false);
       setEditingJob(null);
       setJobForm({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' });
       fetchData();
-    } catch (err) { alert("Action failed."); }
+    } catch (err) {
+      alert('Action failed.');
+    }
   };
 
-  // DELETE Job
   const handleDeleteJob = async (jobId) => {
-    if (!window.confirm("Are you sure you want to delete this listing? All linked applications will be cleared.")) return;
+    if (!window.confirm('Are you sure you want to delete this listing? All linked applications will be cleared.')) return;
     try {
-      await axios.delete(`http://localhost:8000/api/dashboard/jobs/delete/${jobId}`);
+      await axiosInstance.delete(`/api/dashboard/jobs/delete/${jobId}`);
       fetchData();
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
-  // UPDATE Application Status (Accept/Reject)
   const handleUpdateStatus = async (appId, newStatus) => {
     try {
-      await axios.put(`http://localhost:8000/api/dashboard/applications/status/${appId}`, { status: newStatus });
+      await axiosInstance.put(`/api/dashboard/applications/status/${appId}`, { status: newStatus });
       setSelectedApp(null);
       fetchData();
       alert(`Application marked as ${newStatus}`);
-    } catch (err) { console.error(err); }
+    } catch (err) {
+      console.error(err);
+    }
   };
 
   const openEditModal = (job) => {
@@ -73,7 +81,7 @@ const CompanyDashboard = () => {
   return (
     <div className="flex min-h-screen bg-[#F0F7FF] font-sans text-slate-800">
       {/* Sidebar */}
-      <aside className="w-80 bg-white border-r border-blue-100 p-8 flex flex-col justify-between hidden lg:flex">
+      <aside className="w-80 bg-white border-r border-blue-100 p-8 hidden lg:flex flex-col justify-between">
         <div>
           <div className="flex items-center gap-3 mb-12">
             <div className="h-10 w-10 bg-blue-600 rounded-xl flex items-center justify-center text-white font-bold">JM</div>
@@ -92,6 +100,12 @@ const CompanyDashboard = () => {
             </div>
           )}
         </div>
+        <button
+          onClick={logout}
+          className="text-xs text-slate-400 hover:text-red-500 transition font-semibold text-left"
+        >
+          Sign out
+        </button>
       </aside>
 
       {/* Main Panel */}
@@ -107,26 +121,29 @@ const CompanyDashboard = () => {
         </div>
 
         <div className="grid grid-cols-12 gap-8">
-          {/* List Openings (Read, Update, Delete) */}
+          {/* Job Listings */}
           <div className="col-span-12 lg:col-span-5 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
             <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Current Openings</h3>
             <div className="space-y-4">
               {listings.map(job => (
                 <div key={job.id} className="p-5 bg-blue-50/30 rounded-[24px] flex justify-between items-start group border border-transparent hover:border-blue-100 transition">
-                   <div>
-                     <h4 className="font-bold text-blue-900">{job.title}</h4>
-                     <p className="text-xs text-blue-400 mt-1">{job.location} • {job.job_type}</p>
-                   </div>
-                   <div className="flex gap-2">
-                     <button onClick={() => openEditModal(job)} className="p-2 text-slate-400 hover:text-blue-600 transition"><Edit3 size={16}/></button>
-                     <button onClick={() => handleDeleteJob(job.id)} className="p-2 text-slate-400 hover:text-red-500 transition"><Trash2 size={16}/></button>
-                   </div>
+                  <div>
+                    <h4 className="font-bold text-blue-900">{job.title}</h4>
+                    <p className="text-xs text-blue-400 mt-1">{job.location} • {job.job_type}</p>
+                  </div>
+                  <div className="flex gap-2">
+                    <button onClick={() => openEditModal(job)} className="p-2 text-slate-400 hover:text-blue-600 transition"><Edit3 size={16}/></button>
+                    <button onClick={() => handleDeleteJob(job.id)} className="p-2 text-slate-400 hover:text-red-500 transition"><Trash2 size={16}/></button>
+                  </div>
                 </div>
               ))}
+              {listings.length === 0 && (
+                <p className="text-sm text-slate-400 italic">No openings posted yet.</p>
+              )}
             </div>
           </div>
 
-          {/* Applicants Management */}
+          {/* Applicants */}
           <div className="col-span-12 lg:col-span-7 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
             <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Recent Applications</h3>
             <div className="space-y-4">
@@ -140,27 +157,45 @@ const CompanyDashboard = () => {
                   <button onClick={() => setSelectedApp(app)} className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-xs font-black hover:bg-blue-600 hover:text-white transition">REVIEW</button>
                 </div>
               ))}
+              {applicants.length === 0 && (
+                <p className="text-sm text-slate-400 italic">No applications yet.</p>
+              )}
             </div>
           </div>
         </div>
       </main>
 
-      {/* MODAL: CREATE/UPDATE JOB */}
+      {/* MODAL: CREATE / UPDATE JOB */}
       {showModal && (
         <div className="fixed inset-0 bg-blue-900/10 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[48px] p-10 shadow-2xl relative border border-blue-50">
             <button onClick={() => setShowModal(false)} className="absolute right-8 top-8 text-blue-200 hover:text-blue-600"><X size={24}/></button>
             <h3 className="text-3xl font-bold text-blue-950 mb-8">{editingJob ? 'Edit Position' : 'New Position'}</h3>
             <form onSubmit={handleSubmitJob} className="space-y-5">
-              <input className="w-full p-5 bg-blue-50/50 border-0 rounded-[24px] focus:ring-2 focus:ring-blue-600" placeholder="Job Title" value={jobForm.title} onChange={(e) => setJobForm({...jobForm, title: e.target.value})} required />
-              <textarea className="w-full p-5 bg-blue-50/50 border-0 rounded-[24px] focus:ring-2 focus:ring-blue-600" placeholder="Description" rows="4" value={jobForm.description} onChange={(e) => setJobForm({...jobForm, description: e.target.value})} required />
-              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-[28px] font-bold shadow-xl">{editingJob ? 'Save Changes' : 'Publish Job'}</button>
+              <input
+                className="w-full p-5 bg-blue-50/50 border-0 rounded-[24px] focus:ring-2 focus:ring-blue-600"
+                placeholder="Job Title"
+                value={jobForm.title}
+                onChange={(e) => setJobForm({ ...jobForm, title: e.target.value })}
+                required
+              />
+              <textarea
+                className="w-full p-5 bg-blue-50/50 border-0 rounded-[24px] focus:ring-2 focus:ring-blue-600"
+                placeholder="Description"
+                rows="4"
+                value={jobForm.description}
+                onChange={(e) => setJobForm({ ...jobForm, description: e.target.value })}
+                required
+              />
+              <button type="submit" className="w-full py-5 bg-blue-600 text-white rounded-[28px] font-bold shadow-xl">
+                {editingJob ? 'Save Changes' : 'Publish Job'}
+              </button>
             </form>
           </div>
         </div>
       )}
 
-      {/* MODAL: REVIEW PROFILE & CHANGE APPLICATION STATUS */}
+      {/* MODAL: REVIEW APPLICATION */}
       {selectedApp && (
         <div className="fixed inset-0 bg-blue-900/10 backdrop-blur-md flex items-center justify-center z-50 p-4">
           <div className="bg-white w-full max-w-lg rounded-[48px] p-10 shadow-2xl relative border border-blue-50">
@@ -168,10 +203,12 @@ const CompanyDashboard = () => {
             <h3 className="text-3xl font-bold text-blue-950 mb-2">{selectedApp.candidate_name}</h3>
             <p className="text-blue-600 font-bold mb-6 text-xs uppercase tracking-widest">Targeting: {selectedApp.job_title}</p>
             <div className="space-y-6 text-sm">
-              <div className="bg-blue-50/50 p-6 rounded-[32px] text-blue-900 leading-relaxed italic">"{selectedApp.candidate_summary || "No biography added."}"</div>
+              <div className="bg-blue-50/50 p-6 rounded-[32px] text-blue-900 leading-relaxed italic">
+                "{selectedApp.candidate_summary || 'No biography added.'}"
+              </div>
               <div className="flex gap-4 pt-4">
-                 <button onClick={() => handleUpdateStatus(selectedApp.app_id, "Accepted")} className="flex-1 py-4 bg-green-500 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 shadow-lg"><Check size={16}/> Accept</button>
-                 <button onClick={() => handleUpdateStatus(selectedApp.app_id, "Rejected")} className="flex-1 py-4 bg-red-500 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 shadow-lg"><Ban size={16}/> Reject</button>
+                <button onClick={() => handleUpdateStatus(selectedApp.app_id, 'Accepted')} className="flex-1 py-4 bg-green-500 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 shadow-lg"><Check size={16}/> Accept</button>
+                <button onClick={() => handleUpdateStatus(selectedApp.app_id, 'Rejected')} className="flex-1 py-4 bg-red-500 text-white rounded-[24px] font-bold flex items-center justify-center gap-2 shadow-lg"><Ban size={16}/> Reject</button>
               </div>
             </div>
           </div>
