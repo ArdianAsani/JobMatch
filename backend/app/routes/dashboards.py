@@ -57,6 +57,14 @@ def _get_company_or_403(db: Session, user_id: int) -> CompanyProfile:
     return company
 
 
+def _require_approved(company: CompanyProfile):
+    if not company.is_approved:
+        raise HTTPException(
+            status_code=status.HTTP_403_FORBIDDEN,
+            detail="Company account is pending admin approval",
+        )
+
+
 def _get_candidate_or_403(db: Session, user_id: int) -> CandidateProfile:
     candidate = db.query(CandidateProfile).filter(CandidateProfile.user_id == user_id).first()
     if not candidate:
@@ -91,6 +99,7 @@ def get_company_dashboard(
             "name": company.company_name,
             "industry": company.industry,
             "location": "Prishtina, Kosovë",
+            "is_approved": company.is_approved,
         },
     }
 
@@ -103,6 +112,7 @@ def create_job(
 ):
     _require_role(current_user, "COMPANY")
     company = _get_company_or_403(db, current_user["user_id"])
+    _require_approved(company)
 
     new_job = JobListing(
         company_id=company.id,
@@ -126,6 +136,7 @@ def update_job(
 ):
     _require_role(current_user, "COMPANY")
     company = _get_company_or_403(db, current_user["user_id"])
+    _require_approved(company)
 
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
     if not job:
@@ -149,6 +160,7 @@ def delete_job(
 ):
     _require_role(current_user, "COMPANY")
     company = _get_company_or_403(db, current_user["user_id"])
+    _require_approved(company)
 
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
     if not job:
@@ -202,6 +214,7 @@ def update_application_status(
 ):
     _require_role(current_user, "COMPANY")
     company = _get_company_or_403(db, current_user["user_id"])
+    _require_approved(company)
 
     application = db.query(Application).filter(Application.id == app_id).first()
     if not application:

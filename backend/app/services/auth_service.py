@@ -4,6 +4,8 @@ from fastapi import HTTPException, status
 from app.repositories import role_repository, user_repository, refresh_token_repository
 from app.schemas.auth_schemas import RegisterSchema, LoginSchema
 from app.utils.password_utils import hash_password, verify_password
+from app.models.company_profile import CompanyProfile
+from app.models.candidate_profile import CandidateProfile
 from app.utils.token_utils import create_access_token
 from app.utils.refresh_token_utils import (
     generate_refresh_token,
@@ -34,6 +36,14 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
         password_hash=hash_password(data.password),
         role_id=role.id,
     )
+
+    if role.name == "COMPANY":
+        # first_name carries the company name (set by the registration form)
+        db.add(CompanyProfile(user_id=user.id, company_name=user.first_name, is_approved=False))
+        db.commit()
+    elif role.name == "CANDIDATE":
+        db.add(CandidateProfile(user_id=user.id))
+        db.commit()
 
     return {
         "id": user.id,

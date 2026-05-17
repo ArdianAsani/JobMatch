@@ -1,5 +1,6 @@
-import { LayoutDashboard, Building2, Users, Briefcase } from 'lucide-react';
+import { LayoutDashboard, Building2, Users, Briefcase, LogOut } from 'lucide-react';
 import { logout } from '../../utils/auth';
+import { Logo } from '../landing/LandingNavbar';
 
 const NAV_ITEMS = [
   { id: 'overview',  label: 'Overview',         icon: LayoutDashboard },
@@ -11,9 +12,8 @@ const NAV_ITEMS = [
 const AdminSidebar = ({ activeSection, onNavigate }) => (
   <aside className="w-72 bg-[#1e1b4b] min-h-screen flex flex-col justify-between p-8 flex-shrink-0">
     <div>
-      <div className="flex items-center gap-3 mb-12">
-        <div className="h-9 w-9 bg-indigo-400 rounded-xl flex items-center justify-center text-white font-black text-sm">JM</div>
-        <span className="text-white font-bold text-lg tracking-tight">JobMatch</span>
+      <div className="mb-12">
+        <Logo light />
       </div>
 
       <p className="text-[10px] font-black text-indigo-300 tracking-[0.25em] uppercase mb-4">Admin Panel</p>
@@ -38,8 +38,9 @@ const AdminSidebar = ({ activeSection, onNavigate }) => (
 
     <button
       onClick={logout}
-      className="text-xs text-indigo-300 hover:text-rose-400 transition font-semibold text-left"
+      className="flex items-center gap-2 w-full px-4 py-3 rounded-xl text-sm font-semibold text-indigo-300 hover:bg-rose-500/20 hover:text-rose-300 transition-all"
     >
+      <LogOut size={17} />
       Sign out
     </button>
   </aside>

@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { jwtDecode } from 'jwt-decode';
-import { Layout, Briefcase, Users, Plus, X, Globe, MapPin, Trash2, Edit3, Check, Ban } from 'lucide-react';
+import { Plus, X, Globe, MapPin, Trash2, Edit3, Check, Ban, Clock } from 'lucide-react';
 import axiosInstance from '../api/axiosInstance';
 import { getToken, logout } from '../utils/auth';
 
@@ -15,6 +15,9 @@ const CompanyDashboard = () => {
 
   // Decode the logged-in user's ID from the JWT — never hardcoded
   const userId = jwtDecode(getToken()).sub;
+
+  // Derived from server response — null while loading, true/false once fetched
+  const isApproved = companyInfo?.is_approved ?? null;
 
   const fetchData = async () => {
     try {
@@ -115,54 +118,72 @@ const CompanyDashboard = () => {
             <h2 className="text-4xl font-bold tracking-tighter text-blue-950">Dashboard</h2>
             <p className="text-blue-400 mt-2 font-medium">Full Openings & Application Management Pool.</p>
           </div>
-          <button onClick={() => { setEditingJob(null); setShowModal(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">
-            <Plus size={20}/> Post Opening
-          </button>
+          {isApproved && (
+            <button onClick={() => { setEditingJob(null); setShowModal(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">
+              <Plus size={20}/> Post Opening
+            </button>
+          )}
         </div>
 
-        <div className="grid grid-cols-12 gap-8">
-          {/* Job Listings */}
-          <div className="col-span-12 lg:col-span-5 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
-            <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Current Openings</h3>
-            <div className="space-y-4">
-              {listings.map(job => (
-                <div key={job.id} className="p-5 bg-blue-50/30 rounded-[24px] flex justify-between items-start group border border-transparent hover:border-blue-100 transition">
-                  <div>
-                    <h4 className="font-bold text-blue-900">{job.title}</h4>
-                    <p className="text-xs text-blue-400 mt-1">{job.location} • {job.job_type}</p>
-                  </div>
-                  <div className="flex gap-2">
-                    <button onClick={() => openEditModal(job)} className="p-2 text-slate-400 hover:text-blue-600 transition"><Edit3 size={16}/></button>
-                    <button onClick={() => handleDeleteJob(job.id)} className="p-2 text-slate-400 hover:text-red-500 transition"><Trash2 size={16}/></button>
-                  </div>
-                </div>
-              ))}
-              {listings.length === 0 && (
-                <p className="text-sm text-slate-400 italic">No openings posted yet.</p>
-              )}
+        {/* Pending approval banner */}
+        {isApproved === false && (
+          <div className="flex flex-col items-center justify-center py-24 text-center">
+            <div className="h-16 w-16 bg-amber-50 border border-amber-100 rounded-full flex items-center justify-center mb-6">
+              <Clock size={28} className="text-amber-500" />
             </div>
+            <h3 className="text-2xl font-bold text-slate-800 mb-3">Account Pending Approval</h3>
+            <p className="text-slate-500 max-w-md leading-relaxed">
+              Your company account is pending admin approval. You will be able to post jobs and manage applications after approval.
+            </p>
           </div>
+        )}
 
-          {/* Applicants */}
-          <div className="col-span-12 lg:col-span-7 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
-            <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Recent Applications</h3>
-            <div className="space-y-4">
-              {applicants.map(app => (
-                <div key={app.app_id} className="p-6 bg-white rounded-[32px] flex justify-between items-center border border-blue-50 hover:shadow-md transition">
-                  <div>
-                    <h4 className="font-bold text-slate-800">{app.candidate_name}</h4>
-                    <p className="text-xs text-blue-500 font-bold uppercase tracking-tight">{app.job_title}</p>
-                    <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold mt-1 inline-block">{app.app_status}</span>
+        {/* Normal dashboard — only shown when approved */}
+        {isApproved && (
+          <div className="grid grid-cols-12 gap-8">
+            {/* Job Listings */}
+            <div className="col-span-12 lg:col-span-5 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
+              <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Current Openings</h3>
+              <div className="space-y-4">
+                {listings.map(job => (
+                  <div key={job.id} className="p-5 bg-blue-50/30 rounded-[24px] flex justify-between items-start group border border-transparent hover:border-blue-100 transition">
+                    <div>
+                      <h4 className="font-bold text-blue-900">{job.title}</h4>
+                      <p className="text-xs text-blue-400 mt-1">{job.location} • {job.job_type}</p>
+                    </div>
+                    <div className="flex gap-2">
+                      <button onClick={() => openEditModal(job)} className="p-2 text-slate-400 hover:text-blue-600 transition"><Edit3 size={16}/></button>
+                      <button onClick={() => handleDeleteJob(job.id)} className="p-2 text-slate-400 hover:text-red-500 transition"><Trash2 size={16}/></button>
+                    </div>
                   </div>
-                  <button onClick={() => setSelectedApp(app)} className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-xs font-black hover:bg-blue-600 hover:text-white transition">REVIEW</button>
-                </div>
-              ))}
-              {applicants.length === 0 && (
-                <p className="text-sm text-slate-400 italic">No applications yet.</p>
-              )}
+                ))}
+                {listings.length === 0 && (
+                  <p className="text-sm text-slate-400 italic">No openings posted yet.</p>
+                )}
+              </div>
+            </div>
+
+            {/* Applicants */}
+            <div className="col-span-12 lg:col-span-7 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
+              <h3 className="text-lg font-bold mb-6 text-blue-900 italic">Recent Applications</h3>
+              <div className="space-y-4">
+                {applicants.map(app => (
+                  <div key={app.app_id} className="p-6 bg-white rounded-[32px] flex justify-between items-center border border-blue-50 hover:shadow-md transition">
+                    <div>
+                      <h4 className="font-bold text-slate-800">{app.candidate_name}</h4>
+                      <p className="text-xs text-blue-500 font-bold uppercase tracking-tight">{app.job_title}</p>
+                      <span className="text-[10px] px-2 py-0.5 rounded-full bg-blue-50 text-blue-600 font-bold mt-1 inline-block">{app.app_status}</span>
+                    </div>
+                    <button onClick={() => setSelectedApp(app)} className="bg-blue-50 text-blue-600 px-6 py-2 rounded-full text-xs font-black hover:bg-blue-600 hover:text-white transition">REVIEW</button>
+                  </div>
+                ))}
+                {applicants.length === 0 && (
+                  <p className="text-sm text-slate-400 italic">No applications yet.</p>
+                )}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </main>
 
       {/* MODAL: CREATE / UPDATE JOB */}

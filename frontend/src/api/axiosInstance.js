@@ -3,7 +3,6 @@ import { getToken, getRefreshToken, clearAuthTokens } from '../utils/auth'
 
 const BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:8000'
 
-console.log('🚀 API Base URL është:', BASE_URL)   // Kjo duhet të shfaqet
 
 const axiosInstance = axios.create({
   baseURL: BASE_URL,
@@ -28,7 +27,12 @@ axiosInstance.interceptors.response.use(
   async error => {
     const original = error.config
 
-    if (error.response?.status !== 401 || original._retried) {
+    // Auth endpoints return 401 as a business error (wrong credentials, expired
+    // refresh token). Never attempt token-refresh on those — it would loop or
+    // trigger an unwanted page reload on the login screen.
+    const isAuthEndpoint = original.url?.includes('/auth/')
+
+    if (error.response?.status !== 401 || original._retried || isAuthEndpoint) {
       return Promise.reject(error)
     }
 

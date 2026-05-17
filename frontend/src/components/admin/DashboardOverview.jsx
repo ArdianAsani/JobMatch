@@ -1,5 +1,6 @@
 import { Users, Building2, Briefcase, FileText, Clock } from 'lucide-react';
 import StatCard from './StatCard';
+import StatusBadge from './StatusBadge';
 import LoadingState from './LoadingState';
 
 const STAT_CONFIG = [
@@ -41,9 +42,7 @@ const DashboardOverview = ({ stats, loading, pendingCompanies, onNavigate }) => 
                   <p className="font-semibold text-slate-700 text-sm">{c.company_name}</p>
                   <p className="text-xs text-slate-400">{c.email} · {c.industry ?? 'No industry'}</p>
                 </div>
-                <span className="text-[11px] font-bold text-amber-600 bg-amber-50 border border-amber-100 px-3 py-1 rounded-full uppercase tracking-wider">
-                  Pending
-                </span>
+                <StatusBadge label="Pending" />
               </div>
             ))}
           </div>
