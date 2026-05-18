@@ -28,6 +28,8 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
             detail=f"Role '{data.role_name}' does not exist",
         )
 
+    # create_user() uses db.flush() internally — the User row is sent to the DB
+    # and gets its auto-generated id, but the transaction is not committed yet.
     user = user_repository.create_user(
         db=db,
         first_name=data.first_name,
@@ -37,13 +39,20 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
         role_id=role.id,
     )
 
+    # Stage the role-specific profile in the same transaction.
+    # user.id is available now (assigned by the flush above).
     if role.name == "COMPANY":
-        # first_name carries the company name (set by the registration form)
+        # The registration form sends the company name in the first_name field.
         db.add(CompanyProfile(user_id=user.id, company_name=user.first_name, is_approved=False))
-        db.commit()
     elif role.name == "CANDIDATE":
         db.add(CandidateProfile(user_id=user.id))
-        db.commit()
+
+    # Single commit — User and Profile are persisted atomically.
+    # If anything raises before this point the transaction has not been committed,
+    # so get_db()'s finally block (db.close()) will roll back both the user
+    # and the profile insert — no orphaned rows.
+    db.commit()
+    db.refresh(user)
 
     return {
         "id": user.id,

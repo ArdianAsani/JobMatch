@@ -1,11 +1,14 @@
+import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 import random
 from app.database import get_db
-from app.models import JobListing, Application, CandidateProfile, CompanyProfile
+from app.models import User, JobListing, Application, CandidateProfile, CompanyProfile
 from app.routes.auth_routes import get_current_user_info
+
+logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboards"])
 
@@ -50,10 +53,21 @@ def _require_role(current_user: dict, required_role: str):
 def _get_company_or_403(db: Session, user_id: int) -> CompanyProfile:
     company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id).first()
     if not company:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No company profile found for this account",
+        # Auto-recovery for accounts created before profile creation was added to the
+        # registration flow (pre-f51c6d6). Instead of blocking with a 403, we create the
+        # missing profile on the spot so the user can continue without re-registering.
+        # The company name is stored in User.first_name (set by the registration form).
+        user = db.query(User).filter(User.id == user_id).first()
+        company_name = user.first_name if user else f"Company #{user_id}"
+        logger.warning(
+            "CompanyProfile missing for user_id=%d — auto-creating as %r (legacy account recovery)",
+            user_id,
+            company_name,
         )
+        company = CompanyProfile(user_id=user_id, company_name=company_name, is_approved=False)
+        db.add(company)
+        db.commit()
+        db.refresh(company)
     return company
 
 
@@ -68,10 +82,18 @@ def _require_approved(company: CompanyProfile):
 def _get_candidate_or_403(db: Session, user_id: int) -> CandidateProfile:
     candidate = db.query(CandidateProfile).filter(CandidateProfile.user_id == user_id).first()
     if not candidate:
-        raise HTTPException(
-            status_code=status.HTTP_403_FORBIDDEN,
-            detail="No candidate profile found for this account",
+        # Auto-recovery for accounts created before profile creation was added to the
+        # registration flow (pre-f51c6d6). Instead of blocking with a 403, we create the
+        # missing profile on the spot so the user can continue without re-registering.
+        # All profile fields default to NULL — the user can fill them in later.
+        logger.warning(
+            "CandidateProfile missing for user_id=%d — auto-creating (legacy account recovery)",
+            user_id,
         )
+        candidate = CandidateProfile(user_id=user_id)
+        db.add(candidate)
+        db.commit()
+        db.refresh(candidate)
     return candidate
 
 
@@ -87,9 +109,9 @@ def get_company_dashboard(
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id).first()
-    if not company:
-        raise HTTPException(status_code=404, detail="Company profile not found")
+    # Use the shared helper so legacy accounts without a profile get auto-recovered
+    # consistently, rather than hitting a different 404 path here.
+    company = _get_company_or_403(db, user_id)
 
     listings = db.query(JobListing).filter(JobListing.company_id == company.id).all()
     return {

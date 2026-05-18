@@ -1,9 +1,24 @@
+/**
+ * Login page.
+ *
+ * Flow:
+ *   1. User submits email + password
+ *   2. Client-side validation runs first (no network call on obvious errors)
+ *   3. POST /auth/login → receives { access_token, refresh_token, role }
+ *   4. auth.login(data) → persists tokens AND updates React state immediately
+ *      (this is the fix for the stale-context bug: previously storeAuthTokens
+ *      was called but AuthContext was never notified, so the UI stayed "logged out"
+ *      until a page refresh)
+ *   5. navigate() to the role-appropriate dashboard
+ */
+
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout'
 import axiosInstance from '../api/axiosInstance'
 import { validateLoginForm, hasErrors } from '../utils/validation'
-import { getDashboardPath, storeAuthTokens } from '../utils/auth'
+import { getDashboardPath } from '../utils/auth'
+import { useAuth } from '../contexts/AuthContext'
 
 function EnvelopeIcon() {
   return (
@@ -46,12 +61,15 @@ export default function Login() {
   const [fieldErrors, setFieldErrors] = useState({})
   const [serverError, setServerError] = useState('')
   const [loading, setLoading] = useState(false)
+
   const navigate = useNavigate()
+  const { login } = useAuth()
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setServerError('')
 
+    // Run client-side validation before making any network request
     const errors = validateLoginForm(email, password)
     if (hasErrors(errors)) {
       setFieldErrors(errors)
@@ -62,7 +80,10 @@ export default function Login() {
 
     try {
       const { data } = await axiosInstance.post('/auth/login', { email, password })
-      storeAuthTokens(data)
+
+      // login() persists tokens to localStorage AND updates React context state
+      // immediately — no page refresh needed for the UI to reflect the session.
+      login(data)
       navigate(getDashboardPath(data.role))
     } catch (err) {
       setServerError(err.response?.data?.detail || 'Invalid email or password.')

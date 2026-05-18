@@ -1,8 +1,21 @@
-import React, { useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { Compass, FileText, MapPin, Briefcase, Zap, Send, Trash2 } from 'lucide-react';
-import axiosInstance from '../api/axiosInstance';
-import { getToken, logout } from '../utils/auth';
+/**
+ * Candidate Dashboard.
+ *
+ * Two tabs:
+ *   - Explore Jobs: lists all active job listings with a mock AI match score
+ *   - My Applications: shows the candidate's submitted applications and their statuses
+ *
+ * user.id (from AuthContext) is used for API calls that require the candidate's
+ * user ID in the URL. This replaces the previous jwtDecode(getToken()).sub pattern
+ * which was fragile (could crash if the token was null or malformed at render time).
+ *
+ * logout() comes from AuthContext so it also clears React state, not just localStorage.
+ */
+
+import { useState, useEffect } from 'react'
+import { Compass, FileText, MapPin, Briefcase, Zap, Send, Trash2 } from 'lucide-react'
+import axiosInstance from '../api/axiosInstance'
+import { useAuth } from '../contexts/AuthContext'
 
 const STATUS_COLORS = {
   'Pending':      'bg-yellow-50 text-yellow-600 border border-yellow-100',
@@ -10,51 +23,63 @@ const STATUS_COLORS = {
   'Interview':    'bg-purple-50 text-purple-600 border border-purple-100',
   'Accepted':     'bg-green-50 text-green-600 border border-green-100',
   'Rejected':     'bg-red-50 text-red-600 border border-red-100',
-};
+}
 
 const CandidateDashboard = () => {
-  const [jobs, setJobs] = useState([]);
-  const [myApps, setMyApps] = useState([]);
-  const [activeTab, setActiveTab] = useState('explore');
+  const { user, logout } = useAuth()
 
-  // Decode the logged-in user's ID from the JWT — never hardcoded
-  const userId = jwtDecode(getToken()).sub;
+  const [jobs, setJobs] = useState([])
+  const [myApps, setMyApps] = useState([])
+  const [activeTab, setActiveTab] = useState('explore')
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
   const fetchData = async () => {
+    setIsLoading(true)
+    setError('')
     try {
-      const resJobs = await axiosInstance.get('/api/dashboard/jobs/all');
-      setJobs(resJobs.data);
-
-      const resApps = await axiosInstance.get(`/api/dashboard/applications/my/${userId}`);
-      setMyApps(resApps.data);
+      // Both requests run in parallel — jobs list and this candidate's applications
+      const [resJobs, resApps] = await Promise.all([
+        axiosInstance.get('/api/dashboard/jobs/all'),
+        axiosInstance.get(`/api/dashboard/applications/my/${user.id}`),
+      ])
+      setJobs(resJobs.data)
+      setMyApps(resApps.data)
     } catch (err) {
-      console.error(err);
+      setError(err.response?.data?.detail || 'Failed to load dashboard data. Please refresh.')
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
-  useEffect(() => { fetchData(); }, []);
+  // Fetch data once when the component mounts.
+  // user.id is stable for the lifetime of a session, so the empty dep array is correct.
+  useEffect(() => {
+    fetchData()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleApply = async (jobId) => {
     try {
-      // candidate_id derived from JWT on backend; cv_file_id omitted until file upload is built
-      await axiosInstance.post('/api/dashboard/applications/create', { job_id: jobId });
-      alert('Application sent successfully!');
-      fetchData();
+      // candidate_id is derived from the JWT on the backend — not sent from client
+      // cv_file_id is omitted until the file upload feature is implemented
+      await axiosInstance.post('/api/dashboard/applications/create', { job_id: jobId })
+      alert('Application sent successfully!')
+      fetchData()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to apply.');
+      alert(err.response?.data?.detail || 'Failed to apply.')
     }
-  };
+  }
 
   const handleCancelApplication = async (appId) => {
-    if (!window.confirm('Are you sure you want to retract this application?')) return;
+    if (!window.confirm('Are you sure you want to retract this application?')) return
     try {
-      await axiosInstance.delete(`/api/dashboard/applications/cancel/${appId}`);
-      alert('Application retracted.');
-      fetchData();
+      await axiosInstance.delete(`/api/dashboard/applications/cancel/${appId}`)
+      alert('Application retracted.')
+      fetchData()
     } catch (err) {
-      console.error(err);
+      alert(err.response?.data?.detail || 'Failed to retract application.')
     }
-  };
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F0F7FF] font-sans text-slate-800">
@@ -104,8 +129,22 @@ const CandidateDashboard = () => {
 
         <div className="max-w-4xl mx-auto px-6 py-12">
 
+          {/* Global loading state */}
+          {isLoading && (
+            <div className="flex items-center justify-center py-24">
+              <div className="text-sm text-slate-400 animate-pulse">Loading...</div>
+            </div>
+          )}
+
+          {/* Global error state */}
+          {!isLoading && error && (
+            <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl px-6 py-4 mb-8">
+              {error}
+            </div>
+          )}
+
           {/* EXPLORE TAB */}
-          {activeTab === 'explore' && (
+          {!isLoading && !error && activeTab === 'explore' && (
             <>
               <header className="mb-12">
                 <h1 className="text-5xl font-bold tracking-tighter text-blue-950 mb-3 italic">Next Step.</h1>
@@ -147,7 +186,7 @@ const CandidateDashboard = () => {
           )}
 
           {/* APPLICATIONS TAB */}
-          {activeTab === 'applications' && (
+          {!isLoading && !error && activeTab === 'applications' && (
             <>
               <header className="mb-12">
                 <h1 className="text-5xl font-bold tracking-tighter text-blue-950 mb-3 italic">Track Progress.</h1>
@@ -198,7 +237,7 @@ const CandidateDashboard = () => {
         </div>
       </main>
     </div>
-  );
-};
+  )
+}
 
-export default CandidateDashboard;
+export default CandidateDashboard

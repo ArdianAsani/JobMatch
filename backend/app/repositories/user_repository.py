@@ -27,6 +27,17 @@ def create_user(
         role_id=role_id,
     )
     db.add(user)
-    db.commit()
+
+    # flush() sends the INSERT to the database within the current open transaction
+    # so the DB assigns user.id via autoincrement — but does NOT commit yet.
+    #
+    # The caller (auth_service.register_user) is responsible for calling db.commit()
+    # once the full operation (user + role-specific profile) is complete.
+    # This ensures both records are committed atomically: if profile creation fails,
+    # the entire transaction is rolled back and no orphaned user row is left behind.
+    db.flush()
+
+    # refresh() runs a SELECT on the same open connection to load all
+    # server-generated column values (id, created_at, updated_at).
     db.refresh(user)
     return user

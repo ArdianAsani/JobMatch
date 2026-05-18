@@ -1,85 +1,105 @@
-import React, { useState, useEffect } from 'react';
-import { jwtDecode } from 'jwt-decode';
-import { Plus, X, Globe, MapPin, Trash2, Edit3, Check, Ban, Clock } from 'lucide-react';
-import axiosInstance from '../api/axiosInstance';
-import { getToken, logout } from '../utils/auth';
+/**
+ * Company Dashboard.
+ *
+ * Sections:
+ *   - Job listings CRUD (create, edit, delete)
+ *   - Applicant review with status updates (Accepted / Rejected)
+ *   - Approval gate: companies pending admin approval see a banner instead of the dashboard
+ *
+ * user.id (from AuthContext) replaces the previous jwtDecode(getToken()).sub pattern.
+ * logout() comes from AuthContext so React state is cleared alongside localStorage.
+ */
+
+import { useState, useEffect } from 'react'
+import { Plus, X, Globe, MapPin, Trash2, Edit3, Check, Ban, Clock } from 'lucide-react'
+import axiosInstance from '../api/axiosInstance'
+import { useAuth } from '../contexts/AuthContext'
 
 const CompanyDashboard = () => {
-  const [listings, setListings] = useState([]);
-  const [applicants, setApplicants] = useState([]);
-  const [companyInfo, setCompanyInfo] = useState(null);
-  const [showModal, setShowModal] = useState(false);
-  const [editingJob, setEditingJob] = useState(null);
-  const [selectedApp, setSelectedApp] = useState(null);
-  const [jobForm, setJobForm] = useState({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' });
+  const { user, logout } = useAuth()
 
-  // Decode the logged-in user's ID from the JWT — never hardcoded
-  const userId = jwtDecode(getToken()).sub;
+  const [listings, setListings] = useState([])
+  const [applicants, setApplicants] = useState([])
+  const [companyInfo, setCompanyInfo] = useState(null)
+  const [showModal, setShowModal] = useState(false)
+  const [editingJob, setEditingJob] = useState(null)
+  const [selectedApp, setSelectedApp] = useState(null)
+  const [jobForm, setJobForm] = useState({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' })
+  const [isLoading, setIsLoading] = useState(true)
+  const [error, setError] = useState('')
 
-  // Derived from server response — null while loading, true/false once fetched
-  const isApproved = companyInfo?.is_approved ?? null;
+  // null while loading, true/false once the API responds
+  const isApproved = companyInfo?.is_approved ?? null
 
   const fetchData = async () => {
+    setIsLoading(true)
+    setError('')
     try {
-      const res = await axiosInstance.get(`/api/dashboard/company/${userId}`);
-      setListings(res.data.my_listings);
-      setCompanyInfo(res.data.company_info);
-
-      const resApp = await axiosInstance.get(`/api/dashboard/company/${userId}/applicants`);
-      setApplicants(resApp.data);
+      // Both requests run in parallel to reduce wait time
+      const [res, resApp] = await Promise.all([
+        axiosInstance.get(`/api/dashboard/company/${user.id}`),
+        axiosInstance.get(`/api/dashboard/company/${user.id}/applicants`),
+      ])
+      setListings(res.data.my_listings)
+      setCompanyInfo(res.data.company_info)
+      setApplicants(resApp.data)
     } catch (err) {
-      console.error(err);
+      setError(err.response?.data?.detail || 'Failed to load dashboard data. Please refresh.')
+    } finally {
+      setIsLoading(false)
     }
-  };
+  }
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => {
+    fetchData()
+  }, []) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmitJob = async (e) => {
-    e.preventDefault();
+    e.preventDefault()
     try {
       if (editingJob) {
-        await axiosInstance.put(`/api/dashboard/jobs/update/${editingJob.id}`, jobForm);
-        alert('Opportunity updated!');
+        await axiosInstance.put(`/api/dashboard/jobs/update/${editingJob.id}`, jobForm)
+        alert('Opportunity updated!')
       } else {
-        // company_id is no longer sent — backend derives it from the JWT
-        await axiosInstance.post('/api/dashboard/jobs/create', jobForm);
-        alert('Opportunity published!');
+        // company_id is derived from the JWT on the backend — not sent from client
+        await axiosInstance.post('/api/dashboard/jobs/create', jobForm)
+        alert('Opportunity published!')
       }
-      setShowModal(false);
-      setEditingJob(null);
-      setJobForm({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' });
-      fetchData();
+      setShowModal(false)
+      setEditingJob(null)
+      setJobForm({ title: '', description: '', location: 'Prishtina', job_type: 'Full-time' })
+      fetchData()
     } catch (err) {
-      alert('Action failed.');
+      alert(err.response?.data?.detail || 'Action failed.')
     }
-  };
+  }
 
   const handleDeleteJob = async (jobId) => {
-    if (!window.confirm('Are you sure you want to delete this listing? All linked applications will be cleared.')) return;
+    if (!window.confirm('Are you sure you want to delete this listing? All linked applications will be cleared.')) return
     try {
-      await axiosInstance.delete(`/api/dashboard/jobs/delete/${jobId}`);
-      fetchData();
+      await axiosInstance.delete(`/api/dashboard/jobs/delete/${jobId}`)
+      fetchData()
     } catch (err) {
-      console.error(err);
+      alert(err.response?.data?.detail || 'Failed to delete listing.')
     }
-  };
+  }
 
   const handleUpdateStatus = async (appId, newStatus) => {
     try {
-      await axiosInstance.put(`/api/dashboard/applications/status/${appId}`, { status: newStatus });
-      setSelectedApp(null);
-      fetchData();
-      alert(`Application marked as ${newStatus}`);
+      await axiosInstance.put(`/api/dashboard/applications/status/${appId}`, { status: newStatus })
+      setSelectedApp(null)
+      fetchData()
+      alert(`Application marked as ${newStatus}`)
     } catch (err) {
-      console.error(err);
+      alert(err.response?.data?.detail || 'Failed to update status.')
     }
-  };
+  }
 
   const openEditModal = (job) => {
-    setEditingJob(job);
-    setJobForm({ title: job.title, description: job.description, location: job.location, job_type: job.job_type });
-    setShowModal(true);
-  };
+    setEditingJob(job)
+    setJobForm({ title: job.title, description: job.description, location: job.location, job_type: job.job_type })
+    setShowModal(true)
+  }
 
   return (
     <div className="flex min-h-screen bg-[#F0F7FF] font-sans text-slate-800">
@@ -119,14 +139,31 @@ const CompanyDashboard = () => {
             <p className="text-blue-400 mt-2 font-medium">Full Openings & Application Management Pool.</p>
           </div>
           {isApproved && (
-            <button onClick={() => { setEditingJob(null); setShowModal(true); }} className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2">
+            <button
+              onClick={() => { setEditingJob(null); setShowModal(true) }}
+              className="bg-blue-600 text-white px-8 py-4 rounded-full font-bold shadow-lg hover:bg-blue-700 transition-all flex items-center gap-2"
+            >
               <Plus size={20}/> Post Opening
             </button>
           )}
         </div>
 
-        {/* Pending approval banner */}
-        {isApproved === false && (
+        {/* Global loading state */}
+        {isLoading && (
+          <div className="flex items-center justify-center py-24">
+            <div className="text-sm text-slate-400 animate-pulse">Loading...</div>
+          </div>
+        )}
+
+        {/* Global error state */}
+        {!isLoading && error && (
+          <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-2xl px-6 py-4">
+            {error}
+          </div>
+        )}
+
+        {/* Pending approval banner — shown while is_approved is explicitly false */}
+        {!isLoading && !error && isApproved === false && (
           <div className="flex flex-col items-center justify-center py-24 text-center">
             <div className="h-16 w-16 bg-amber-50 border border-amber-100 rounded-full flex items-center justify-center mb-6">
               <Clock size={28} className="text-amber-500" />
@@ -139,7 +176,7 @@ const CompanyDashboard = () => {
         )}
 
         {/* Normal dashboard — only shown when approved */}
-        {isApproved && (
+        {!isLoading && !error && isApproved && (
           <div className="grid grid-cols-12 gap-8">
             {/* Job Listings */}
             <div className="col-span-12 lg:col-span-5 bg-white rounded-[40px] p-8 shadow-sm border border-blue-50">
@@ -236,7 +273,7 @@ const CompanyDashboard = () => {
         </div>
       )}
     </div>
-  );
-};
+  )
+}
 
-export default CompanyDashboard;
+export default CompanyDashboard
