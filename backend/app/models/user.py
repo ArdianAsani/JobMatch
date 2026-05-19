@@ -11,8 +11,10 @@ class User(Base):
 
     role_id = Column(Integer, ForeignKey("roles.id"), nullable=False)
 
-    first_name = Column(String(100), nullable=False)
-    last_name = Column(String(100), nullable=False)
+    # Single name field works for both candidates ("John Doe") and companies ("TechNova").
+    # Replaces the previous first_name / last_name split that forced companies to
+    # stuff their name into first_name and leave last_name empty.
+    name = Column(String(200), nullable=False)
     email = Column(String(150), unique=True, index=True, nullable=False)
 
     password_hash = Column(String(255), nullable=False)

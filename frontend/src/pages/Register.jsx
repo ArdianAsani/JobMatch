@@ -2,7 +2,7 @@ import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
 import AuthLayout from '../components/auth/AuthLayout'
 import axiosInstance from '../api/axiosInstance'
-import { validateRegisterForm, hasErrors } from '../utils/validation'
+import { validateRegisterForm, hasErrors, normalizeUrl } from '../utils/validation'
 
 function PersonIcon() {
   return (
@@ -36,19 +36,65 @@ function BuildingIcon() {
   )
 }
 
-function Field({ label, icon, type, placeholder, value, onChange, error }) {
+function GlobeIcon() {
+  return (
+    <svg className="w-4 h-4 text-gray-400 shrink-0" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+      <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 12a9 9 0 01-9 9m9-9a9 9 0 00-9-9m9 9H3m9 9a9 9 0 01-9-9m9 9c1.657 0 3-4.03 3-9s-1.343-9-3-9m0 18c-1.657 0-3-4.03-3-9s1.343-9 3-9m-9 9a9 9 0 019-9" />
+    </svg>
+  )
+}
+
+// Ordered list of industry options shown in the dropdown
+const INDUSTRIES = [
+  'Technology', 'Finance', 'Healthcare', 'Education', 'Marketing',
+  'E-Commerce', 'Manufacturing', 'Real Estate', 'Media', 'Consulting',
+  'Telecommunications', 'Transportation', 'Hospitality', 'Other',
+]
+
+function Field({ label, icon, type, placeholder, value, onChange, error, disabled }) {
   return (
     <div className="mb-4">
       <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
-      <div className={`flex items-center gap-3 border rounded-lg px-4 py-3 focus-within:border-indigo-400 transition-colors ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+      <div className={`flex items-center gap-3 border rounded-lg px-4 py-3 transition-colors ${
+        error ? 'border-red-300 bg-red-50'
+        : disabled ? 'border-gray-100 bg-gray-50'
+        : 'border-gray-200 focus-within:border-indigo-400'
+      }`}>
         {icon}
         <input
           type={type}
           placeholder={placeholder}
-          className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent"
+          className="flex-1 outline-none text-sm text-gray-700 placeholder-gray-400 bg-transparent disabled:text-gray-400"
           value={value}
           onChange={onChange}
+          disabled={disabled}
         />
+      </div>
+      {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
+    </div>
+  )
+}
+
+// Dropdown wrapper that matches the Field visual style
+function SelectField({ label, value, onChange, error, options, placeholder }) {
+  return (
+    <div className="mb-4">
+      <label className="block text-sm font-semibold text-gray-700 mb-2">{label}</label>
+      <div className={`flex items-center border rounded-lg px-4 py-3 focus-within:border-indigo-400 transition-colors ${error ? 'border-red-300 bg-red-50' : 'border-gray-200'}`}>
+        <select
+          className="flex-1 outline-none text-sm text-gray-700 bg-transparent appearance-none cursor-pointer"
+          value={value}
+          onChange={onChange}
+        >
+          <option value="">{placeholder || 'Select an option'}</option>
+          {options.map(opt => (
+            <option key={opt} value={opt}>{opt}</option>
+          ))}
+        </select>
+        {/* Chevron icon */}
+        <svg className="w-4 h-4 text-gray-400 shrink-0 pointer-events-none" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+        </svg>
       </div>
       {error && <p className="mt-1 text-xs text-red-500">{error}</p>}
     </div>
@@ -78,7 +124,15 @@ const roles = [
   },
 ]
 
-const initialForm = { firstName: '', lastName: '', companyName: '', email: '', password: '' }
+const initialForm = {
+  // Candidates: full name ("John Doe"). Companies: company name ("TechNova").
+  // Both submit as `name` — no more firstName/lastName split.
+  name: '', companyName: '',
+  email: '', password: '',
+  // Company-specific fields
+  industry: '', customIndustry: '',
+  website: '', noWebsite: false,
+}
 
 export default function Register() {
   const [step, setStep] = useState(1)
@@ -90,6 +144,8 @@ export default function Register() {
   const navigate = useNavigate()
 
   const setField = key => e => setForm(f => ({ ...f, [key]: e.target.value }))
+  // Checkbox fields carry a boolean value via e.target.checked
+  const setCheck = key => e => setForm(f => ({ ...f, [key]: e.target.checked }))
 
   const handleSubmit = async (e) => {
     e.preventDefault()
@@ -104,12 +160,23 @@ export default function Register() {
     setLoading(true)
 
     try {
+      // Resolve effective website: null when "no website" is checked or field is empty
+      const resolvedWebsite = (role === 'COMPANY' && !form.noWebsite && form.website.trim())
+        ? normalizeUrl(form.website)   // auto-prepend https:// if missing
+        : null
+
       await axiosInstance.post('/auth/register', {
-        first_name: role === 'COMPANY' ? form.companyName : form.firstName,
-        last_name: role === 'COMPANY' ? '' : form.lastName,
+        // Both roles send a single `name` field — companies use their company name
+        name: role === 'COMPANY' ? form.companyName : form.name,
         email: form.email,
         password: form.password,
         role_name: role,
+        // Only include company fields for COMPANY role registrations
+        ...(role === 'COMPANY' && {
+          industry: form.industry,
+          custom_industry: form.industry === 'Other' ? form.customIndustry : undefined,
+          website: resolvedWebsite,
+        }),
       })
       navigate('/login')
     } catch (err) {
@@ -180,36 +247,72 @@ export default function Register() {
 
             <form onSubmit={handleSubmit} noValidate>
               {role === 'COMPANY' ? (
-                <Field
-                  label="Company Name"
-                  icon={<BuildingIcon />}
-                  type="text"
-                  placeholder="e.g. TechCorp Inc."
-                  value={form.companyName}
-                  onChange={setField('companyName')}
-                  error={fieldErrors.companyName}
-                />
-              ) : (
                 <>
                   <Field
-                    label="First Name"
-                    icon={<PersonIcon />}
+                    label="Company Name"
+                    icon={<BuildingIcon />}
                     type="text"
-                    placeholder="e.g. Sarah"
-                    value={form.firstName}
-                    onChange={setField('firstName')}
-                    error={fieldErrors.firstName}
+                    placeholder="e.g. TechCorp Inc."
+                    value={form.companyName}
+                    onChange={setField('companyName')}
+                    error={fieldErrors.companyName}
                   />
+
+                  {/* Industry dropdown — required for companies */}
+                  <SelectField
+                    label="Industry"
+                    value={form.industry}
+                    onChange={setField('industry')}
+                    error={fieldErrors.industry}
+                    options={INDUSTRIES}
+                    placeholder="Select your industry"
+                  />
+
+                  {/* Conditional text input shown only when "Other" is selected */}
+                  {form.industry === 'Other' && (
+                    <Field
+                      label="Specify Industry"
+                      icon={<BuildingIcon />}
+                      type="text"
+                      placeholder="e.g. Renewable Energy"
+                      value={form.customIndustry}
+                      onChange={setField('customIndustry')}
+                      error={fieldErrors.customIndustry}
+                    />
+                  )}
+
+                  {/* Website field — optional; disabled when "no website" checkbox is checked */}
                   <Field
-                    label="Last Name"
-                    icon={<PersonIcon />}
+                    label="Website (optional)"
+                    icon={<GlobeIcon />}
                     type="text"
-                    placeholder="e.g. Johnson"
-                    value={form.lastName}
-                    onChange={setField('lastName')}
-                    error={fieldErrors.lastName}
+                    placeholder="e.g. company.com"
+                    value={form.website}
+                    onChange={setField('website')}
+                    error={fieldErrors.website}
+                    disabled={form.noWebsite}
                   />
+                  <label className="flex items-center gap-2 mb-4 cursor-pointer select-none">
+                    <input
+                      type="checkbox"
+                      className="w-4 h-4 accent-indigo-600 rounded"
+                      checked={form.noWebsite}
+                      onChange={setCheck('noWebsite')}
+                    />
+                    <span className="text-sm text-gray-600">We do not have a website</span>
+                  </label>
                 </>
+              ) : (
+                // Single full-name field for candidates — replaces First Name + Last Name
+                <Field
+                  label="Full Name"
+                  icon={<PersonIcon />}
+                  type="text"
+                  placeholder="e.g. Sarah Johnson"
+                  value={form.name}
+                  onChange={setField('name')}
+                  error={fieldErrors.name}
+                />
               )}
               <Field
                 label="Email address"

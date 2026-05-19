@@ -13,15 +13,13 @@ def get_user_by_id(db: Session, user_id: int) -> Optional[User]:
 
 def create_user(
     db: Session,
-    first_name: str,
-    last_name: str,
+    name: str,
     email: str,
     password_hash: str,
     role_id: int,
 ) -> User:
     user = User(
-        first_name=first_name,
-        last_name=last_name,
+        name=name,
         email=email,
         password_hash=password_hash,
         role_id=role_id,

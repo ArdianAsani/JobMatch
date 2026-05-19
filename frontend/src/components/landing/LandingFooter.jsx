@@ -23,19 +23,18 @@ export default function LandingFooter() {
             <ul className="space-y-3">
               <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">Find Jobs</a></li>
               <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">Post a Job</a></li>
-              <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">How It Works</a></li>
             </ul>
           </div>
 
-          {/* Project */}
+          {/* Contact */}
           <div>
             <h4 className="text-white text-xs font-bold tracking-widest mb-4">
-              PROJECT
+              CONTACT
             </h4>
             <ul className="space-y-3">
-              <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">About JobMatch</a></li>
-              <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">Documentation</a></li>
-              <li><a href="#" className="text-gray-400 text-sm hover:text-white transition-colors">Contact</a></li>
+              <li><a href="/about" className="text-gray-400 text-sm hover:text-white transition-colors">About JobMatch</a></li>
+              <li className="text-gray-400 text-sm">+383 44 123 456</li>
+              <li className="text-gray-400 text-sm">contact@jobmatch.com</li>
             </ul>
           </div>
         </div>

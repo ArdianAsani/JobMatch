@@ -25,8 +25,8 @@ const DashboardOverview = ({ stats, loading, pendingCompanies, onNavigate }) => 
 
       {/* Pending Companies Preview */}
       {(pendingCompanies?.length ?? 0) > 0 && (
-        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-6">
-          <div className="flex items-center justify-between mb-5">
+        <div className="bg-white rounded-2xl border border-slate-100 shadow-sm p-4 sm:p-6">
+          <div className="flex items-center justify-between mb-4 sm:mb-5">
             <h2 className="font-bold text-slate-700">Awaiting Approval</h2>
             <button
               onClick={() => onNavigate('approvals')}
@@ -37,7 +37,7 @@ const DashboardOverview = ({ stats, loading, pendingCompanies, onNavigate }) => 
           </div>
           <div className="space-y-3">
             {pendingCompanies?.slice(0, 3).map((c) => (
-              <div key={c.company_profile_id} className="flex items-center justify-between py-3 border-b border-slate-50 last:border-0">
+              <div key={c.company_profile_id} className="flex items-start sm:items-center justify-between gap-2 py-3 border-b border-slate-50 last:border-0">
                 <div>
                   <p className="font-semibold text-slate-700 text-sm">{c.company_name}</p>
                   <p className="text-xs text-slate-400">{c.email} · {c.industry ?? 'No industry'}</p>

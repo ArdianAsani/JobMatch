@@ -32,8 +32,7 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
     # and gets its auto-generated id, but the transaction is not committed yet.
     user = user_repository.create_user(
         db=db,
-        first_name=data.first_name,
-        last_name=data.last_name,
+        name=data.name,
         email=data.email,
         password_hash=hash_password(data.password),
         role_id=role.id,
@@ -42,8 +41,18 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
     # Stage the role-specific profile in the same transaction.
     # user.id is available now (assigned by the flush above).
     if role.name == "COMPANY":
-        # The registration form sends the company name in the first_name field.
-        db.add(CompanyProfile(user_id=user.id, company_name=user.first_name, is_approved=False))
+        # user.name holds the company name directly — no more first_name workaround.
+        # When industry == "Other", use the user's free-text value from custom_industry.
+        effective_industry = (
+            data.custom_industry.strip() if data.industry == "Other" else data.industry
+        )
+        db.add(CompanyProfile(
+            user_id=user.id,
+            company_name=user.name,
+            industry=effective_industry,
+            website=data.website,   # already normalized by schema; None when no website
+            is_approved=False,
+        ))
     elif role.name == "CANDIDATE":
         db.add(CandidateProfile(user_id=user.id))
 
@@ -56,8 +65,7 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
 
     return {
         "id": user.id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
+        "name": user.name,
         "email": user.email,
         "role": role.name,
         "is_active": user.is_active,
@@ -158,8 +166,7 @@ def get_current_user_profile(db: Session, user_id: int) -> dict:
 
     return {
         "id": user.id,
-        "first_name": user.first_name,
-        "last_name": user.last_name,
+        "name": user.name,
         "email": user.email,
         "role": user.role.name,
         "is_active": user.is_active,

@@ -1,5 +1,6 @@
 import LandingNavbar from '../components/landing/LandingNavbar'
 import LandingFooter from '../components/landing/LandingFooter'
+import { Link } from 'react-router-dom'
 
 const offerings = [
   {
@@ -103,12 +104,12 @@ export default function About() {
             Join candidates and companies already using JobMatch.
           </p>
           <div className="flex flex-col sm:flex-row gap-4 justify-center">
-            <button className="bg-white text-indigo-600 px-8 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors">
+            <Link to="/register" className="bg-white text-indigo-600 px-8 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors">
               Find Jobs
-            </button>
-            <button className="border-2 border-white text-white px-8 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors">
+            </Link>
+            <Link to="/register" className="border-2 border-white text-white px-8 py-3 rounded-xl font-semibold hover:bg-white/10 transition-colors">
               Post a Job
-            </button>
+            </Link>
           </div>
         </div>
       </section>

@@ -18,8 +18,7 @@ class AdminStatsResponse(BaseModel):
 
 class AdminUserRow(BaseModel):
     id: int
-    first_name: str
-    last_name: str
+    name: str
     email: str
     role: str
     is_active: bool
@@ -30,8 +29,7 @@ class AdminUserRow(BaseModel):
 
 class ToggleUserActiveResponse(BaseModel):
     id: int
-    first_name: str
-    last_name: str
+    name: str
     email: str
     is_active: bool
     message: str

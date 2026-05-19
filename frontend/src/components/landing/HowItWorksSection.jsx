@@ -1,3 +1,4 @@
+import { Link } from 'react-router-dom'
 const steps = [
   {
     step: '1',
@@ -46,9 +47,9 @@ export default function HowItWorksSection() {
         </div>
 
         <div className="flex flex-col sm:flex-row justify-center gap-4 mt-14">
-          <button className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
+          <Link to="/register" className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold hover:bg-indigo-700 transition-colors">
             Get Started Free
-          </button>
+          </Link>
           <button className="border-2 border-indigo-600 text-indigo-600 px-8 py-3 rounded-xl font-semibold hover:bg-indigo-50 transition-colors">
             Browse Jobs
           </button>

@@ -57,7 +57,13 @@ def get_stats(
     inactive_jobs = db.query(func.count(JobListing.id)).filter(JobListing.is_active == False).scalar()
 
     total_companies = db.query(func.count(CompanyProfile.id)).scalar()
-    pending_companies = db.query(func.count(CompanyProfile.id)).filter(CompanyProfile.is_approved == False).scalar()
+    # Exclude inactive users so rejected companies (is_active=False) are never counted as pending
+    pending_companies = (
+        db.query(func.count(CompanyProfile.id))
+        .join(User, CompanyProfile.user_id == User.id)
+        .filter(CompanyProfile.is_approved == False, User.is_active == True)
+        .scalar()
+    )
     approved_companies = db.query(func.count(CompanyProfile.id)).filter(CompanyProfile.is_approved == True).scalar()
 
     total_applications = db.query(func.count(Application.id)).scalar()
@@ -112,8 +118,7 @@ def get_all_users(
     return [
         AdminUserRow(
             id=u.id,
-            first_name=u.first_name,
-            last_name=u.last_name,
+            name=u.name,
             email=u.email,
             role=u.role.name,
             is_active=u.is_active,
@@ -146,8 +151,7 @@ def toggle_user_active(
     action = "activated" if user.is_active else "deactivated"
     return ToggleUserActiveResponse(
         id=user.id,
-        first_name=user.first_name,
-        last_name=user.last_name,
+        name=user.name,
         email=user.email,
         is_active=user.is_active,
         message=f"User {action} successfully",
@@ -195,7 +199,9 @@ def get_pending_companies(
     rows = (
         db.query(CompanyProfile, User.email)
         .join(User, CompanyProfile.user_id == User.id)
-        .filter(CompanyProfile.is_approved == False)
+        # Also require the user account to be active: rejected companies have
+        # is_active=False and must never re-appear in the pending approvals list.
+        .filter(CompanyProfile.is_approved == False, User.is_active == True)
         .order_by(CompanyProfile.created_at.desc())
         .all()
     )
@@ -386,7 +392,7 @@ def get_all_applications(
             Application.status,
             Application.applied_at,
             Application.updated_at,
-            (User.first_name + " " + User.last_name).label("candidate_name"),
+            User.name.label("candidate_name"),
             User.email.label("candidate_email"),
             JobListing.title.label("job_title"),
             CompanyProfile.company_name,

@@ -1,14 +1,11 @@
-import logging
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
 from typing import Optional
 import random
 from app.database import get_db
-from app.models import User, JobListing, Application, CandidateProfile, CompanyProfile
+from app.models import JobListing, Application, CandidateProfile, CompanyProfile
 from app.routes.auth_routes import get_current_user_info
-
-logger = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/api/dashboard", tags=["Dashboards"])
 
@@ -50,24 +47,10 @@ def _require_role(current_user: dict, required_role: str):
         )
 
 
-def _get_company_or_403(db: Session, user_id: int) -> CompanyProfile:
+def _get_company_or_404(db: Session, user_id: int) -> CompanyProfile:
     company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id).first()
     if not company:
-        # Auto-recovery for accounts created before profile creation was added to the
-        # registration flow (pre-f51c6d6). Instead of blocking with a 403, we create the
-        # missing profile on the spot so the user can continue without re-registering.
-        # The company name is stored in User.first_name (set by the registration form).
-        user = db.query(User).filter(User.id == user_id).first()
-        company_name = user.first_name if user else f"Company #{user_id}"
-        logger.warning(
-            "CompanyProfile missing for user_id=%d — auto-creating as %r (legacy account recovery)",
-            user_id,
-            company_name,
-        )
-        company = CompanyProfile(user_id=user_id, company_name=company_name, is_approved=False)
-        db.add(company)
-        db.commit()
-        db.refresh(company)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company profile not found")
     return company
 
 
@@ -79,21 +62,10 @@ def _require_approved(company: CompanyProfile):
         )
 
 
-def _get_candidate_or_403(db: Session, user_id: int) -> CandidateProfile:
+def _get_candidate_or_404(db: Session, user_id: int) -> CandidateProfile:
     candidate = db.query(CandidateProfile).filter(CandidateProfile.user_id == user_id).first()
     if not candidate:
-        # Auto-recovery for accounts created before profile creation was added to the
-        # registration flow (pre-f51c6d6). Instead of blocking with a 403, we create the
-        # missing profile on the spot so the user can continue without re-registering.
-        # All profile fields default to NULL — the user can fill them in later.
-        logger.warning(
-            "CandidateProfile missing for user_id=%d — auto-creating (legacy account recovery)",
-            user_id,
-        )
-        candidate = CandidateProfile(user_id=user_id)
-        db.add(candidate)
-        db.commit()
-        db.refresh(candidate)
+        raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate profile not found")
     return candidate
 
 
@@ -109,9 +81,7 @@ def get_company_dashboard(
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    # Use the shared helper so legacy accounts without a profile get auto-recovered
-    # consistently, rather than hitting a different 404 path here.
-    company = _get_company_or_403(db, user_id)
+    company = _get_company_or_404(db, user_id)
 
     listings = db.query(JobListing).filter(JobListing.company_id == company.id).all()
     return {
@@ -133,7 +103,7 @@ def create_job(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "COMPANY")
-    company = _get_company_or_403(db, current_user["user_id"])
+    company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
 
     new_job = JobListing(
@@ -157,7 +127,7 @@ def update_job(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "COMPANY")
-    company = _get_company_or_403(db, current_user["user_id"])
+    company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
 
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
@@ -181,7 +151,7 @@ def delete_job(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "COMPANY")
-    company = _get_company_or_403(db, current_user["user_id"])
+    company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
 
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
@@ -235,7 +205,7 @@ def update_application_status(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "COMPANY")
-    company = _get_company_or_403(db, current_user["user_id"])
+    company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
 
     application = db.query(Application).filter(Application.id == app_id).first()
@@ -266,6 +236,8 @@ def get_all_jobs(
             JobListing.location, JobListing.job_type, CompanyProfile.company_name,
         )
         .join(CompanyProfile, JobListing.company_id == CompanyProfile.id)
+        # Only expose jobs that are active — admin may deactivate any listing
+        .filter(JobListing.is_active == True)
         .all()
     )
 
@@ -285,7 +257,14 @@ def create_application(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "CANDIDATE")
-    candidate = _get_candidate_or_403(db, current_user["user_id"])
+    candidate = _get_candidate_or_404(db, current_user["user_id"])
+
+    # Guard against stale frontend state: reject applications to inactive jobs server-side
+    job = db.query(JobListing).filter(JobListing.id == app_in.job_id).first()
+    if not job:
+        raise HTTPException(status_code=404, detail="Job not found")
+    if not job.is_active:
+        raise HTTPException(status_code=400, detail="This job is no longer active and cannot receive applications")
 
     existing = db.query(Application).filter(
         Application.candidate_id == candidate.id,
@@ -316,7 +295,7 @@ def get_my_applications(
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
 
-    candidate = _get_candidate_or_403(db, user_id)
+    candidate = _get_candidate_or_404(db, user_id)
 
     results = (
         db.query(
@@ -340,7 +319,7 @@ def cancel_application(
     current_user: dict = Depends(get_current_user_info),
 ):
     _require_role(current_user, "CANDIDATE")
-    candidate = _get_candidate_or_403(db, current_user["user_id"])
+    candidate = _get_candidate_or_404(db, current_user["user_id"])
 
     application = db.query(Application).filter(Application.id == app_id).first()
     if not application:

@@ -9,6 +9,7 @@ import JobListings from '../components/admin/JobListings';
 
 const AdminDashboard = () => {
   const [activeSection, setActiveSection] = useState('overview');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
   const [error, setError] = useState('');
 
   const [stats, setStats] = useState(null);
@@ -85,8 +86,9 @@ const AdminDashboard = () => {
   const handleApprove = async (companyId) => {
     try {
       await axiosInstance.put(`/api/admin/companies/${companyId}/approve`);
-      fetchPending();
-      fetchStats();
+      setPendingCompanies(prev => prev.filter(c => c.company_profile_id !== companyId));
+      // Decrement locally so the stats card reflects the change without a round-trip fetch
+      setStats(prev => prev && ({ ...prev, pending_companies: Math.max(prev.pending_companies - 1, 0) }));
     } catch (err) {
       alert(err.response?.data?.detail ?? 'Failed to approve company.');
     }
@@ -95,8 +97,11 @@ const AdminDashboard = () => {
   const handleReject = async (companyId) => {
     try {
       await axiosInstance.put(`/api/admin/companies/${companyId}/reject`);
-      fetchPending();
-      fetchStats();
+      // Remove immediately from local state so the row disappears without a round-trip.
+      // The backend also now filters inactive users, so a hard refresh produces the same result.
+      setPendingCompanies(prev => prev.filter(c => c.company_profile_id !== companyId));
+      // Decrement locally so the stats card reflects the change without a round-trip fetch
+      setStats(prev => prev && ({ ...prev, pending_companies: Math.max(prev.pending_companies - 1, 0) }));
       fetchUsers();
     } catch (err) {
       alert(err.response?.data?.detail ?? 'Failed to reject company.');
@@ -166,12 +171,22 @@ const AdminDashboard = () => {
     ),
   };
 
+  const handleNavigate = (section) => {
+    setActiveSection(section);
+    setSidebarOpen(false);
+  };
+
   return (
     <div className="flex min-h-screen bg-slate-50 font-sans text-slate-800">
-      <AdminSidebar activeSection={activeSection} onNavigate={setActiveSection} />
+      <AdminSidebar
+        activeSection={activeSection}
+        onNavigate={handleNavigate}
+        isOpen={sidebarOpen}
+        onClose={() => setSidebarOpen(false)}
+      />
       <div className="flex-1 flex flex-col min-w-0">
-        <AdminTopbar activeSection={activeSection} />
-        <main className="flex-1 p-8 md:p-10">
+        <AdminTopbar activeSection={activeSection} onMenuToggle={() => setSidebarOpen(prev => !prev)} />
+        <main className="flex-1 p-4 sm:p-6 md:p-8 lg:p-10">
           {error && (
             <div className="mb-6 px-5 py-3 bg-rose-50 border border-rose-200 text-rose-700 text-sm font-medium rounded-xl">
               {error}
