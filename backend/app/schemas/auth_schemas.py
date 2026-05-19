@@ -1,10 +1,15 @@
+# Skemat Pydantic për validimin e të dhënave të autentikimit
+# Pydantic validon automatikisht request body-n para se të hyjë në route
+# Nëse validimi dështon, FastAPI kthen 422 Unprocessable Entity automatikisht
 from pydantic import BaseModel, EmailStr, field_validator, model_validator
 from datetime import datetime
 from typing import Optional
 import re
 
+# Vetëm këto role mund të regjistrohen nga publiku — ADMIN krijohet manualisht
 ALLOWED_PUBLIC_ROLES = {"CANDIDATE", "COMPANY"}
 
+# Lista e industrive të lejuara për kompanitë
 ALLOWED_INDUSTRIES = {
     "Technology", "Finance", "Healthcare", "Education", "Marketing",
     "E-Commerce", "Manufacturing", "Real Estate", "Media", "Consulting",
@@ -29,8 +34,7 @@ def _normalize_url(url: str) -> str:
 
 
 class RegisterSchema(BaseModel):
-    # Single name field: candidates send their full name, companies send their company name.
-    # Eliminates the old first_name / last_name split and the last_name="" company workaround.
+    """Schema e regjistrimit — validon të dhënat nga frontend-i para krijimit të user-it."""
     name: str
     email: EmailStr
     password: str
@@ -54,6 +58,7 @@ class RegisterSchema(BaseModel):
             raise ValueError("Password must be at least 8 characters")
         return v
 
+    # Parandalon regjistrimin me role si ADMIN nëpërmjet API-t publike
     @field_validator("role_name")
     @classmethod
     def role_must_be_allowed(cls, v: str) -> str:
@@ -88,19 +93,23 @@ class RegisterSchema(BaseModel):
 
 
 class LoginSchema(BaseModel):
+    """Schema e login-it — vetëm email dhe fjalëkalimi."""
     email: EmailStr
     password: str
 
 
 class RefreshRequestSchema(BaseModel):
+    """Klienti dërgon refresh token-in për të marrë access token të ri."""
     refresh_token: str
 
 
 class LogoutRequestSchema(BaseModel):
+    """Klienti dërgon refresh token-in për ta anuluar gjatë logout-it."""
     refresh_token: str
 
 
 class UserResponseSchema(BaseModel):
+    """Përgjigja standarde me të dhënat bazë të user-it."""
     id: int
     name: str
     email: str
@@ -112,6 +121,7 @@ class UserResponseSchema(BaseModel):
 
 
 class TokenResponseSchema(BaseModel):
+    """Përgjigja pas login-it të suksesshëm — kthen të dy token-ët."""
     access_token: str
     refresh_token: str
     token_type: str
@@ -119,9 +129,11 @@ class TokenResponseSchema(BaseModel):
 
 
 class AccessTokenResponseSchema(BaseModel):
+    """Përgjigja pas rinovimit të access token-it — vetëm access token i ri."""
     access_token: str
     token_type: str
 
 
 class MessageSchema(BaseModel):
+    """Përgjigje e thjeshtë me mesazh — përdoret për logout dhe operacione të ngjashme."""
     message: str

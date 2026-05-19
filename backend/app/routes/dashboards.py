@@ -1,3 +1,6 @@
+# Route-t e dashboard-eve — endpoint-et për kompanitë dhe kandidatët
+# Të gjitha endpoint-et këtu janë të mbrojtura me JWT (Depends(get_current_user_info))
+# Autorizimi bazë mbi rol bëhet me helper-in _require_role()
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from pydantic import BaseModel
@@ -40,6 +43,7 @@ class ApplicationStatusUpdate(BaseModel):
 # --- INTERNAL HELPERS ---
 
 def _require_role(current_user: dict, required_role: str):
+    """Hedh 403 nëse roli i user-it aktual nuk përputhet me rolin e kërkuar."""
     if current_user["role"] != required_role:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -48,6 +52,7 @@ def _require_role(current_user: dict, required_role: str):
 
 
 def _get_company_or_404(db: Session, user_id: int) -> CompanyProfile:
+    """Kërkon profilin e kompanisë sipas user_id. Hedh 404 nëse nuk gjendet."""
     company = db.query(CompanyProfile).filter(CompanyProfile.user_id == user_id).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company profile not found")
@@ -55,6 +60,10 @@ def _get_company_or_404(db: Session, user_id: int) -> CompanyProfile:
 
 
 def _require_approved(company: CompanyProfile):
+    """
+    Bllokون operacionet e kompanisë nëse profili nuk është miratuar nga admini.
+    Kompanitë e paaprovuara nuk mund të postojnë ose modifikojnë punët.
+    """
     if not company.is_approved:
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -63,6 +72,7 @@ def _require_approved(company: CompanyProfile):
 
 
 def _get_candidate_or_404(db: Session, user_id: int) -> CandidateProfile:
+    """Kërkon profilin e kandidatit sipas user_id. Hedh 404 nëse nuk gjendet."""
     candidate = db.query(CandidateProfile).filter(CandidateProfile.user_id == user_id).first()
     if not candidate:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Candidate profile not found")
@@ -77,6 +87,7 @@ def get_company_dashboard(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """Kthen panelin e kompanisë me listën e shpalljeve të saj."""
     _require_role(current_user, "COMPANY")
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -102,6 +113,11 @@ def create_job(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Krijon një shpallje të re pune.
+    Vetëm kompanitë e miratuara mund të postojnë punë.
+    company_id merret nga JWT — jo nga klienti — për të shmangur manipulimin.
+    """
     _require_role(current_user, "COMPANY")
     company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
@@ -126,6 +142,10 @@ def update_job(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Modifikon një shpallje ekzistuese.
+    Verifikohet që shpallja i përket kompanisë që bën kërkesën.
+    """
     _require_role(current_user, "COMPANY")
     company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
@@ -150,6 +170,10 @@ def delete_job(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Fshin një shpallje pune dhe të gjitha aplikimet e lidhura me të.
+    Aplikimet fshihen para shpalljes për të respektuar çelësat e huaj (FK constraint).
+    """
     _require_role(current_user, "COMPANY")
     company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
@@ -172,6 +196,7 @@ def get_company_applicants(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """Kthen listën e të gjithë aplikantëve për punët e kësaj kompanie."""
     _require_role(current_user, "COMPANY")
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -204,6 +229,10 @@ def update_application_status(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Ndryshon statusin e aplikimit nga kompania (p.sh. nga Pending në Under Review).
+    Verifikohet që aplikimi i përket një pune të kësaj kompanie — jo të tjetrës.
+    """
     _require_role(current_user, "COMPANY")
     company = _get_company_or_404(db, current_user["user_id"])
     _require_approved(company)
@@ -230,6 +259,11 @@ def get_all_jobs(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Kthen të gjitha shpalljet aktive të punës me emrin e kompanisë.
+    FIX: Filtrohen vetëm punët aktive (is_active=True) — punët e çaktivizuara nga admini
+    nuk shfaqen dhe nuk mund të marrin aplikime.
+    """
     results = (
         db.query(
             JobListing.id, JobListing.title, JobListing.description,
@@ -256,6 +290,14 @@ def create_application(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Krijon aplikimin e kandidatit për një vend pune.
+
+    FIX: Verifikohet në server-side nëse puna është ende aktive.
+    Kjo mbron kundër rasteve kur frontend-i ka gjendjen e vjetër të punëve.
+    Shpallja e çaktivizuar hedh 400 — kandidati nuk mund të aplikojë.
+    Gjithashtu kontrollohet nëse kandidati ka aplikuar tashmë për të njëjtën punë.
+    """
     _require_role(current_user, "CANDIDATE")
     candidate = _get_candidate_or_404(db, current_user["user_id"])
 
@@ -291,6 +333,10 @@ def get_my_applications(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Kthen të gjitha aplikimet e kandidatit me titullin e punës dhe emrin e kompanisë.
+    Kandidati mund të shohë vetëm aplikimet e veta — jo të kandidatëve të tjerë.
+    """
     _require_role(current_user, "CANDIDATE")
     if current_user["user_id"] != user_id:
         raise HTTPException(status_code=status.HTTP_403_FORBIDDEN, detail="Access denied")
@@ -318,6 +364,10 @@ def cancel_application(
     db: Session = Depends(get_db),
     current_user: dict = Depends(get_current_user_info),
 ):
+    """
+    Anulon aplikimin e kandidatit.
+    Verifikohet që aplikimi i përket kandidatit aktual — jo dikujt tjetër.
+    """
     _require_role(current_user, "CANDIDATE")
     candidate = _get_candidate_or_404(db, current_user["user_id"])
 

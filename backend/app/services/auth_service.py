@@ -1,3 +1,6 @@
+# Shërbimi kryesor i autentikimit — logjika e biznesit për regjistrim, login, dhe token-ët
+# Shtresa service ndodhet midis route-ve (HTTP) dhe repository-ve (databaza)
+# Route-t thërrasin service-in, service-i thërret repository-n
 from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
@@ -15,6 +18,19 @@ from app.utils.refresh_token_utils import (
 
 
 def register_user(db: Session, data: RegisterSchema) -> dict:
+    """
+    Regjistron një përdorues të ri.
+
+    Rrjedha:
+      1. Kontrollon nëse email-i ekziston tashmë
+      2. Verifikon që roli i kërkuar ekziston
+      3. Krijon User-in (me flush — pa commit)
+      4. Krijon profilin sipas rolit (CompanyProfile ose CandidateProfile)
+      5. Kryen commit-in atomik — të dy rekordet ruhen ose asnjë
+
+    FIX: Përdorimi i db.flush() + commit të vetëm mbron kundër user-ëve "jetimë"
+    pa profil nëse krijoni dështon pas ruajtjes së user-it.
+    """
     if user_repository.get_user_by_email(db, data.email):
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -30,6 +46,11 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
 
     # create_user() uses db.flush() internally — the User row is sent to the DB
     # and gets its auto-generated id, but the transaction is not committed yet.
+    #
+    # The caller (auth_service.register_user) is responsible for calling db.commit()
+    # once the full operation (user + role-specific profile) is complete.
+    # This ensures both records are committed atomically: if profile creation fails,
+    # the entire transaction is rolled back and no orphaned user row is left behind.
     user = user_repository.create_user(
         db=db,
         name=data.name,
@@ -74,6 +95,19 @@ def register_user(db: Session, data: RegisterSchema) -> dict:
 
 
 def login_user(db: Session, data: LoginSchema) -> dict:
+    """
+    Autentikon përdoruesin dhe lëshon access + refresh token.
+
+    Rrjedha:
+      1. Kërkon user-in sipas email-it
+      2. Verifikon fjalëkalimin me bcrypt
+      3. Kontrollon nëse llogaria është aktive
+      4. Krijon access token (JWT, jetëshkurtër)
+      5. Krijon refresh token (i gjatë, ruhet i hash-uar në databazë)
+
+    FIX: Mesazhi i gabimit është i njëjtë për email jo ekzistues dhe fjalëkalim gabim
+    — kjo mbron kundër sulme që zbulojnë nëse një email ekziston në sistem.
+    """
     user = user_repository.get_user_by_email(db, data.email)
 
     # Generic message to avoid leaking whether the email exists
@@ -89,8 +123,10 @@ def login_user(db: Session, data: LoginSchema) -> dict:
             detail="Account is inactive",
         )
 
+    # Krijon access token me sub=user_id dhe role — dekodon nga JWT pa query DB
     access_token = create_access_token({"sub": str(user.id), "role": user.role.name})
 
+    # Gjeneron refresh token, hash-on dhe ruan vetëm hash-in
     raw_refresh_token = generate_refresh_token()
     refresh_token_repository.create_refresh_token(
         db=db,
@@ -108,6 +144,20 @@ def login_user(db: Session, data: LoginSchema) -> dict:
 
 
 def refresh_access_token(db: Session, raw_token: str) -> dict:
+    """
+    Lëshon një access token të ri duke përdorur refresh token-in.
+
+    Rrjedha e validimit:
+      1. Hash-on token-in e marrë dhe kërkon në databazë
+      2. Kontrollon nëse token-i ekziston
+      3. Kontrollon nëse token-i është anuluar (revoked)
+      4. Kontrollon nëse token-i ka skaduar
+      5. Kontrollon nëse llogaria e user-it është ende aktive
+      6. Krijon dhe kthen access token të ri
+
+    FIX: timezone-awareness — expires_at nga databaza mund të jetë pa tzinfo;
+    shtohet UTC manualisht para krahasimit për të shmangur TypeError.
+    """
     token_hash = hash_refresh_token(raw_token)
     stored = refresh_token_repository.get_by_hash(db, token_hash)
 
@@ -147,6 +197,11 @@ def refresh_access_token(db: Session, raw_token: str) -> dict:
 
 
 def logout_user(db: Session, raw_token: str) -> dict:
+    """
+    Anullon refresh token-in e dhënë — seansi i përdoruesit bëhet invalid.
+    Nëse token-i nuk gjendet ose është tashmë i anuluar, nuk ndodh gabim.
+    Kjo bën logout-in idempotent dhe të sigurt.
+    """
     token_hash = hash_refresh_token(raw_token)
     stored = refresh_token_repository.get_by_hash(db, token_hash)
 
@@ -157,6 +212,7 @@ def logout_user(db: Session, raw_token: str) -> dict:
 
 
 def get_current_user_profile(db: Session, user_id: int) -> dict:
+    """Kthen profilin bazë të user-it aktiv. Përdoret nga endpoint-i /auth/me."""
     user = user_repository.get_user_by_id(db, user_id)
     if not user:
         raise HTTPException(

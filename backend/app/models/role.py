@@ -1,3 +1,5 @@
+# Modeli Role — përfaqëson tabelën "roles" në databazë
+# Çdo përdorues ka saktësisht një rol: ADMIN, COMPANY ose CANDIDATE
 from sqlalchemy import Column, Integer, String, DateTime
 from sqlalchemy.sql import func
 from app.database import Base

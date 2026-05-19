@@ -1,3 +1,6 @@
+# Route-t e adminit — endpoint-et për menaxhimin e sistemit
+# Të gjitha endpoint-et këtu janë të mbrojtura me require_admin()
+# Vetëm user-ët me rol ADMIN mund t'i aksesojnë
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
@@ -24,6 +27,11 @@ router = APIRouter(prefix="/api/admin", tags=["Admin"])
 # ---------------------------------------------------------------------------
 
 def require_admin(current_user: dict = Depends(get_current_user_info)) -> dict:
+    """
+    Dependency i FastAPI — bllokон çdo request nga jo-adminët.
+    Injektohet në çdo endpoint admin me Depends(require_admin).
+    Hedh 403 Forbidden nëse roli nuk është ADMIN.
+    """
     if current_user["role"] != "ADMIN":
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN,
@@ -41,6 +49,7 @@ def get_stats(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """Kthen numërimet statistikore të të gjithë sistemit për panelin e adminit."""
     total_users = db.query(func.count(User.id)).scalar()
 
     # Count users per role in one query
@@ -57,6 +66,9 @@ def get_stats(
     inactive_jobs = db.query(func.count(JobListing.id)).filter(JobListing.is_active == False).scalar()
 
     total_companies = db.query(func.count(CompanyProfile.id)).scalar()
+
+    # FIX: Vetëm kompanitë me user aktiv numërohen si "pending"
+    # Kompanitë e refuzuara kanë is_active=False dhe nuk duhet të shfaqen sërisht si pending
     # Exclude inactive users so rejected companies (is_active=False) are never counted as pending
     pending_companies = (
         db.query(func.count(CompanyProfile.id))
@@ -108,6 +120,7 @@ def get_all_users(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """Kthen listën e të gjithë user-ëve të renditur sipas datës së regjistrimit."""
     # joinedload avoids N+1: loads role in the same SELECT via JOIN
     users = (
         db.query(User)
@@ -134,6 +147,10 @@ def toggle_user_active(
     db: Session = Depends(get_db),
     current_admin: dict = Depends(require_admin),
 ):
+    """
+    Aktivizon ose deaktivizon llogarinë e user-it.
+    FIX: Admini nuk mund të deaktivizojë llogarinë e vet — mbrojtje nga bllokimi i sistemit.
+    """
     if user_id == current_admin["user_id"]:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
@@ -169,6 +186,7 @@ def get_all_companies(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """Kthen të gjitha kompanitë — të paaprovuarat para të aprovuarave (sipas rendit të prioritetit)."""
     rows = (
         db.query(CompanyProfile, User.email)
         .join(User, CompanyProfile.user_id == User.id)
@@ -196,6 +214,11 @@ def get_pending_companies(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Kthen kompanitë që presin miratim.
+    FIX: Filtrohet edhe User.is_active == True — kompanitë e refuzuara (is_active=False)
+    nuk duhet të shfaqen sërisht në listën e pritjes pas refuzimit.
+    """
     rows = (
         db.query(CompanyProfile, User.email)
         .join(User, CompanyProfile.user_id == User.id)
@@ -227,6 +250,10 @@ def approve_company(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Miraton kompanisë — pas kësaj ajo mund të postojë punë dhe të menaxhojë aplikimet.
+    Nëse kompania është tashmë e aprovuar, kthen 400 për të shmangur operacione të kota.
+    """
     company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
@@ -255,6 +282,11 @@ def reject_company(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Refuzon kompanisë duke deaktivizuar llogarinë e user-it të lidhur.
+    FIX: Profili i kompanisë NUK fshihet — ruhet për auditim dhe historik.
+    user.is_active=False parandalon login-in e kompanisë dhe zhduk nga lista pending.
+    """
     company = db.query(CompanyProfile).filter(CompanyProfile.id == company_id).first()
     if not company:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Company not found")
@@ -284,6 +316,10 @@ def get_all_jobs(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Kthen të gjitha shpalljet e punës (aktive dhe joaktive) me numrin e aplikimeve.
+    Përdor outerjoin me Application — shpalljet pa aplikime shfaqen me applicants_count=0.
+    """
     rows = (
         db.query(
             JobListing.id,
@@ -339,6 +375,10 @@ def toggle_job_active(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Aktivizon ose çaktivizoon një shpallje pune.
+    FIX: Shpalljet e çaktivizuara nuk shfaqen te kandidatët dhe nuk pranojnë aplikime.
+    """
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -362,6 +402,10 @@ def delete_job(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Fshin permanentisht një shpallje pune nga databaza.
+    Aplikimet fshihen para shpalljes për të respektuar çelësat e huaj (FK constraint).
+    """
     job = db.query(JobListing).filter(JobListing.id == job_id).first()
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
@@ -386,6 +430,10 @@ def get_all_applications(
     db: Session = Depends(get_db),
     _: dict = Depends(require_admin),
 ):
+    """
+    Kthen të gjitha aplikimet me të dhënat e kandidatit, punës dhe kompanisë.
+    Përdor JOIN-e të shumta midis tabelave për të mbledhur të gjithë informacionin.
+    """
     rows = (
         db.query(
             Application.id,
