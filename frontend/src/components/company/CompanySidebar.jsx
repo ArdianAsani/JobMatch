@@ -1,0 +1,82 @@
+import { LayoutDashboard, Briefcase, Users, Building2 } from 'lucide-react'
+
+const NAV = [
+  { key: 'dashboard',  label: 'Dashboard',       icon: LayoutDashboard },
+  { key: 'jobs',       label: 'My Job Listings', icon: Briefcase },
+  { key: 'applicants', label: 'Applicants',      icon: Users },
+  { key: 'profile',    label: 'Company Profile', icon: Building2 },
+]
+
+const CompanySidebar = ({ active, onNavigate, companyInfo, logout }) => {
+  const initials = companyInfo?.name
+    ? companyInfo.name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
+    : 'CO'
+
+  return (
+    <aside className="w-64 bg-[#1a2035] flex flex-col h-screen shrink-0">
+      {/* Logo */}
+      <div className="px-6 py-6 border-b border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 bg-indigo-600 rounded-xl flex items-center justify-center">
+            <svg width="18" height="18" viewBox="0 0 24 24" fill="none">
+              <circle cx="11" cy="11" r="7" stroke="white" strokeWidth="2.5"/>
+              <path d="M16.5 16.5L21 21" stroke="white" strokeWidth="2.5" strokeLinecap="round"/>
+            </svg>
+          </div>
+          <span className="text-white font-bold text-lg">
+            Job<span className="text-indigo-400">Match</span>
+          </span>
+        </div>
+        <div className="mt-3">
+          <span className="text-[10px] font-bold tracking-widest text-teal-400 bg-teal-400/10 px-3 py-1 rounded-full">
+            EMPLOYER
+          </span>
+        </div>
+      </div>
+
+      {/* Navigation */}
+      <nav className="flex-1 px-3 py-5 space-y-1 overflow-y-auto">
+        {NAV.map(({ key, label, icon: Icon }) => {
+          const isActive = active === key
+          return (
+            <button
+              key={key}
+              onClick={() => onNavigate(key)}
+              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl text-sm font-medium transition-all ${
+                isActive
+                  ? 'bg-indigo-600 text-white shadow-lg shadow-indigo-900/40'
+                  : 'text-slate-400 hover:text-white hover:bg-white/5'
+              }`}
+            >
+              <Icon size={18} />
+              <span>{label}</span>
+            </button>
+          )
+        })}
+      </nav>
+
+      {/* User info + logout */}
+      <div className="px-4 py-4 border-t border-white/10">
+        <div className="flex items-center gap-3">
+          <div className="h-9 w-9 bg-indigo-600 rounded-full flex items-center justify-center text-white text-xs font-bold shrink-0">
+            {initials}
+          </div>
+          <div className="min-w-0 flex-1">
+            <p className="text-white text-sm font-semibold truncate">
+              {companyInfo?.name || 'Company'}
+            </p>
+            <p className="text-slate-500 text-xs">Employer</p>
+          </div>
+        </div>
+        <button
+          onClick={logout}
+          className="mt-3 w-full text-xs text-slate-500 hover:text-red-400 transition text-left px-1"
+        >
+          Sign out
+        </button>
+      </div>
+    </aside>
+  )
+}
+
+export default CompanySidebar

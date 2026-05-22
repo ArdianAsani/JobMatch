@@ -6,4 +6,5 @@ from .application import Application
 from .ml_match_result import MLMatchResult
 from .candidate_profile import CandidateProfile
 from .company_profile import CompanyProfile
+from .saved_job import SavedJob
 from app.models.file import File

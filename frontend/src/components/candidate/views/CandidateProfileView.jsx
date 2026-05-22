@@ -1,0 +1,297 @@
+import { useState, useEffect, useRef } from 'react'
+import { Edit3, Save, X, MapPin, FileText, Upload, CheckCircle } from 'lucide-react'
+import axiosInstance from '../../../api/axiosInstance'
+import { useAuth } from '../../../contexts/AuthContext'
+
+const Field = ({ label, value }) => (
+  <div>
+    <p className="text-xs text-gray-400 mb-1">{label}</p>
+    <p className="text-sm text-gray-700 font-medium bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 min-h-[38px]">
+      {value || <span className="text-gray-300 font-normal">—</span>}
+    </p>
+  </div>
+)
+
+const Input = ({ label, value, onChange, placeholder }) => (
+  <div>
+    <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">{label}</label>
+    <input
+      type="text"
+      placeholder={placeholder}
+      value={value || ''}
+      onChange={e => onChange(e.target.value)}
+      className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition"
+    />
+  </div>
+)
+
+const CandidateProfileView = ({ onUpdate }) => {
+  const { user } = useAuth()
+  const [profile, setProfile] = useState(null)
+  const [isEditing, setIsEditing] = useState(false)
+  const [form, setForm] = useState({})
+  const [isSaving, setIsSaving] = useState(false)
+  const [error, setError] = useState('')
+  const [cvUploading, setCvUploading] = useState(false)
+  const [cvError, setCvError] = useState('')
+  const fileInputRef = useRef(null)
+
+  const fetchProfile = async () => {
+    try {
+      const res = await axiosInstance.get(`/api/dashboard/candidate/profile/${user.id}`)
+      setProfile(res.data)
+      setForm(res.data)
+    } catch { /* silently fail */ }
+  }
+
+  useEffect(() => { fetchProfile() }, [user.id]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }))
+
+  const handleSave = async () => {
+    setIsSaving(true)
+    setError('')
+    try {
+      const { name, email, profile_strength, ...updatable } = form
+      await axiosInstance.put('/api/dashboard/candidate/profile/update', updatable)
+      await fetchProfile()
+      setIsEditing(false)
+      if (onUpdate) onUpdate({ name: profile?.name, headline: form.headline })
+    } catch (err) {
+      setError(err.response?.data?.detail || 'Failed to save.')
+    } finally {
+      setIsSaving(false)
+    }
+  }
+
+  const handleCvUpload = async (e) => {
+    const file = e.target.files?.[0]
+    if (!file) return
+    setCvError('')
+    setCvUploading(true)
+    try {
+      const formData = new FormData()
+      formData.append('file', file)
+      // Do NOT set Content-Type — browser sets multipart/form-data with boundary automatically
+      const res = await axiosInstance.post('/api/upload/cv', formData, {
+        headers: { 'Content-Type': undefined },
+      })
+      // Refresh profile to show new cv_filename + cv_uploaded_at
+      await fetchProfile()
+    } catch (err) {
+      setCvError(err.response?.data?.detail || 'Upload failed. Try again.')
+    } finally {
+      setCvUploading(false)
+      if (fileInputRef.current) fileInputRef.current.value = ''
+    }
+  }
+
+  if (!profile) {
+    return <div className="flex items-center justify-center py-24"><div className="text-sm text-gray-400 animate-pulse">Loading...</div></div>
+  }
+
+  const initials = (profile.name || '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'CA'
+  const pct = profile.profile_strength || 0
+
+  return (
+    <div className="space-y-5 max-w-5xl">
+      <div className="flex items-center justify-between">
+        <h2 className="text-xl font-bold text-gray-900">My Profile</h2>
+        {!isEditing ? (
+          <button
+            onClick={() => setIsEditing(true)}
+            className="flex items-center gap-2 border border-gray-200 text-gray-600 text-sm font-medium px-4 py-2 rounded-xl hover:bg-gray-50 transition"
+          >
+            <Edit3 size={14} /> Edit Profile
+          </button>
+        ) : (
+          <div className="flex gap-2">
+            <button
+              onClick={() => { setIsEditing(false); setForm(profile) }}
+              className="flex items-center gap-2 border border-gray-200 text-gray-500 text-sm px-4 py-2 rounded-xl hover:bg-gray-50 transition"
+            >
+              <X size={14} /> Cancel
+            </button>
+            <button
+              onClick={handleSave}
+              disabled={isSaving}
+              className="flex items-center gap-2 bg-indigo-600 text-white text-sm font-semibold px-4 py-2 rounded-xl hover:bg-indigo-700 transition disabled:opacity-60"
+            >
+              <Save size={14} /> {isSaving ? 'Saving...' : 'Save Changes'}
+            </button>
+          </div>
+        )}
+      </div>
+
+      {error && (
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
+      )}
+
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-5">
+        {/* Left column */}
+        <div className="space-y-4">
+          {/* Avatar card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6 text-center">
+            <div className="h-16 w-16 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-xl font-bold mx-auto mb-3">
+              {initials}
+            </div>
+            <h3 className="font-bold text-gray-900">{profile.name}</h3>
+            {profile.headline && (
+              <p className="text-sm text-gray-500 mt-1">{profile.headline}</p>
+            )}
+            {profile.location && (
+              <p className="text-xs text-gray-400 mt-1 flex items-center justify-center gap-1">
+                <MapPin size={10} />{profile.location}
+              </p>
+            )}
+            <div className="mt-4">
+              <div className="flex justify-between text-xs mb-1">
+                <span className="text-gray-500">Profile Completion</span>
+                <span className="text-indigo-600 font-semibold">{pct}%</span>
+              </div>
+              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
+                <div className="h-full bg-indigo-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
+              </div>
+            </div>
+          </div>
+
+          {/* Skills card */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
+            <h4 className="font-bold text-gray-900 text-sm mb-3">Skills</h4>
+            {isEditing ? (
+              <Input
+                label="Skills (comma separated)"
+                value={form.skills}
+                onChange={set('skills')}
+                placeholder="React, TypeScript, Node.js"
+              />
+            ) : (
+              <div className="flex flex-wrap gap-2">
+                {(profile.skills || '').split(',').filter(s => s.trim()).map(s => (
+                  <span key={s} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-2.5 py-1 rounded-full font-medium">
+                    {s.trim()}
+                  </span>
+                ))}
+                {!profile.skills && <p className="text-xs text-gray-300">No skills added yet.</p>}
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Right column */}
+        <div className="lg:col-span-2 space-y-4">
+          {/* Personal Information */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h4 className="font-bold text-gray-900 mb-4">Personal Information</h4>
+            {isEditing ? (
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Headline" value={form.headline} onChange={set('headline')} placeholder="Senior Frontend Developer" />
+                <Input label="Phone" value={form.phone} onChange={set('phone')} placeholder="+1 (555) 234-5678" />
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Email</label>
+                  <input disabled value={profile.email || ''} className="w-full bg-gray-100 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-400 cursor-not-allowed" />
+                </div>
+                <Input label="Location" value={form.location} onChange={set('location')} placeholder="San Francisco, CA" />
+                <Input label="LinkedIn URL" value={form.linkedin_url} onChange={set('linkedin_url')} placeholder="linkedin.com/in/username" />
+                <Input label="Experience Level" value={form.experience_level} onChange={set('experience_level')} placeholder="Senior" />
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Headline" value={profile.headline} />
+                <Field label="Phone" value={profile.phone} />
+                <Field label="Email" value={profile.email} />
+                <Field label="Location" value={profile.location} />
+                <Field label="LinkedIn" value={profile.linkedin_url} />
+                <Field label="Experience Level" value={profile.experience_level} />
+              </div>
+            )}
+          </div>
+
+          {/* Resume / CV */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h4 className="font-bold text-gray-900 mb-4">Resume / CV</h4>
+
+            {/* Current CV status */}
+            {profile.cv_filename ? (
+              <div className="flex items-center gap-3 mb-4 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
+                <CheckCircle size={16} className="text-green-600 shrink-0" />
+                <div className="flex-1 min-w-0">
+                  <p className="text-sm font-semibold text-green-800 truncate">{profile.cv_filename}</p>
+                  {profile.cv_uploaded_at && (
+                    <p className="text-xs text-green-600">Uploaded {profile.cv_uploaded_at}</p>
+                  )}
+                </div>
+              </div>
+            ) : (
+              <div className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 mb-4">
+                <div className="h-10 w-10 bg-gray-100 rounded-xl flex items-center justify-center">
+                  <FileText size={18} className="text-gray-400" />
+                </div>
+                <p className="text-sm text-gray-400">No CV uploaded yet.</p>
+              </div>
+            )}
+
+            {/* Upload control — always visible */}
+            <div className="flex items-center gap-3">
+              <input
+                ref={fileInputRef}
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={handleCvUpload}
+                className="hidden"
+                id="cv-file-input"
+              />
+              <label
+                htmlFor="cv-file-input"
+                className={`flex items-center gap-2 cursor-pointer border border-indigo-200 text-indigo-600 text-sm font-medium px-4 py-2 rounded-xl hover:bg-indigo-50 transition ${cvUploading ? 'opacity-60 pointer-events-none' : ''}`}
+              >
+                <Upload size={14} />
+                {cvUploading ? 'Uploading...' : profile.cv_filename ? 'Replace CV' : 'Upload CV'}
+              </label>
+              <span className="text-xs text-gray-400">PDF, DOC, or DOCX · Max 5 MB</span>
+            </div>
+            {cvError && (
+              <p className="text-xs text-red-500 mt-2">{cvError}</p>
+            )}
+          </div>
+
+          {/* Job Preferences */}
+          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+            <h4 className="font-bold text-gray-900 mb-4">Job Preferences</h4>
+            {isEditing ? (
+              <div className="grid grid-cols-2 gap-4">
+                <Input label="Desired Role" value={form.desired_role} onChange={set('desired_role')} placeholder="Senior Frontend Developer" />
+                <Input label="Expected Salary" value={form.expected_salary} onChange={set('expected_salary')} placeholder="$120k–$150k" />
+                <Input label="Education" value={form.education} onChange={set('education')} placeholder="B.Sc. Computer Science" />
+                <div className="col-span-2">
+                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Summary</label>
+                  <textarea
+                    rows={3}
+                    placeholder="Brief professional summary..."
+                    value={form.summary || ''}
+                    onChange={e => setForm(f => ({ ...f, summary: e.target.value }))}
+                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-none"
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="grid grid-cols-2 gap-4">
+                <Field label="Desired Role" value={profile.desired_role} />
+                <Field label="Expected Salary" value={profile.expected_salary} />
+                <Field label="Education" value={profile.education} />
+                {profile.summary && (
+                  <div className="col-span-2">
+                    <p className="text-xs text-gray-400 mb-1">Summary</p>
+                    <p className="text-sm text-gray-700">{profile.summary}</p>
+                  </div>
+                )}
+              </div>
+            )}
+          </div>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+export default CandidateProfileView

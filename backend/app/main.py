@@ -1,12 +1,17 @@
 # Pika kryesore e nisjes së aplikacionit FastAPI
 # Këtu konfigurohet middleware-i, regjistrohen route-t dhe inicializohet databaza
+import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
+from sqlalchemy import inspect as sa_inspect, text
 from app.database import engine, Base, SessionLocal
 from app.models import Role, User  # noqa: F401 — registers models with Base
 from app.routes.auth_routes import router as auth_router
-from app.routes.dashboards import router as dashboard_router
+from app.routes.company_routes import router as company_router
+from app.routes.candidate_routes import router as candidate_router
 from app.routes.admin_routes import router as admin_router
+from app.routes.upload_routes import router as upload_router
 from app.repositories import role_repository
 
 # Krijon instancën kryesore të aplikacionit FastAPI
@@ -34,6 +39,20 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 
+def migrate_db():
+    """Add columns that didn't exist when the DB was first created."""
+    insp = sa_inspect(engine)
+    cols = {c["name"] for c in insp.get_columns("candidate_profiles")}
+    if "cv_file_id" not in cols:
+        with engine.connect() as conn:
+            conn.execute(text(
+                "ALTER TABLE candidate_profiles "
+                "ADD COLUMN cv_file_id INT NULL, "
+                "ADD CONSTRAINT fk_cp_cv_file FOREIGN KEY (cv_file_id) REFERENCES files(id) ON DELETE SET NULL"
+            ))
+            conn.commit()
+
+
 def seed_roles():
     """
     Shton rolet bazë në databazë nëse nuk ekzistojnë ende.
@@ -51,12 +70,19 @@ def seed_roles():
 
 
 # Ekzekutohet menjëherë kur starton serveri
+migrate_db()
 seed_roles()
 
+# Serve uploaded files (CVs, etc.) as static files
+os.makedirs("uploads", exist_ok=True)
+app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+
 # Regjistron route-t e aplikacionit — çdo router ka prefix-in e vet
-app.include_router(auth_router)       # /auth/...
-app.include_router(dashboard_router)  # /api/dashboard/...
-app.include_router(admin_router)      # /api/admin/...
+app.include_router(auth_router)        # /auth/...
+app.include_router(company_router)     # /api/dashboard/company/... & /jobs/... (COMPANY)
+app.include_router(candidate_router)   # /api/dashboard/jobs/all & /applications/... (CANDIDATE)
+app.include_router(admin_router)       # /api/admin/...
+app.include_router(upload_router)      # /api/upload/...
 
 
 @app.get("/")

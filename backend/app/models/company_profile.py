@@ -20,6 +20,10 @@ class CompanyProfile(Base):
     # Referenca opsionale tek skedari i logos së kompanisë
     logo_file_id = Column(Integer, ForeignKey("files.id"), nullable=True)
 
+    company_size = Column(String(100), nullable=True)
+    founded_year = Column(String(10), nullable=True)
+    hq_location = Column(String(200), nullable=True)
+
     # is_approved=False: kompania pret miratimin e adminit para se të postojë punë
     # Ndryshon në True vetëm kur admini e miraton manualisht
     is_approved = Column(Boolean, default=False)

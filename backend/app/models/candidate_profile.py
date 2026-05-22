@@ -29,5 +29,15 @@ class CandidateProfile(Base):
     # Teksti i CV-së i ngarkuar — mund të përdoret nga algoritmi ML për matching
     resume_text = Column(Text)
 
+    # Kontakti dhe preferencat e punës
+    phone = Column(String(50))
+    location = Column(String(200))
+    linkedin_url = Column(String(300))
+    desired_role = Column(String(150))
+    expected_salary = Column(String(100))
+
+    # FK to files.id — set after candidate uploads a CV; auto-attached to new applications
+    cv_file_id = Column(Integer, ForeignKey("files.id"), nullable=True)
+
     created_at = Column(TIMESTAMP, server_default=func.now())
     updated_at = Column(TIMESTAMP, server_default=func.now(), onupdate=func.now())
