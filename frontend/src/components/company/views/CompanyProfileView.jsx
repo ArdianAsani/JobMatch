@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { CheckCircle, Edit3, X, Save } from 'lucide-react'
+import { Edit3, X, Save } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -57,7 +57,6 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
     setError('')
     try {
       await axiosInstance.put('/api/dashboard/company/profile/update', form)
-      // Refetch updated info
       const res = await axiosInstance.get(`/api/dashboard/company/${user.id}`)
       setInfo(res.data.company_info)
       if (onUpdate) onUpdate(res.data.company_info)
@@ -111,7 +110,6 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
         {/* Left — Profile card */}
         <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 flex flex-col items-center text-center">
-          {/* Avatar */}
           <div className="h-20 w-20 bg-indigo-600 rounded-2xl flex items-center justify-center text-white text-2xl font-bold mb-4">
             {initials}
           </div>
@@ -120,8 +118,8 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
             {[info?.industry, info?.hq_location].filter(Boolean).join(' · ') || 'No info yet'}
           </p>
 
-          {/* Mini stats */}
-          <div className="flex gap-6 mt-6 pt-5 border-t border-gray-50 w-full justify-center">
+          {/* Mini stats — only real data */}
+          <div className="flex gap-8 mt-6 pt-5 border-t border-gray-50 w-full justify-center">
             <div className="text-center">
               <p className="text-xl font-bold text-indigo-600">{stats.active_listings}</p>
               <p className="text-xs text-gray-400 mt-0.5">Active Jobs</p>
@@ -130,18 +128,7 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
               <p className="text-xl font-bold text-indigo-600">{stats.total_applicants}</p>
               <p className="text-xs text-gray-400 mt-0.5">Applicants</p>
             </div>
-            <div className="text-center">
-              <p className="text-xl font-bold text-indigo-600">—</p>
-              <p className="text-xs text-gray-400 mt-0.5">Views</p>
-            </div>
           </div>
-
-          {/* Verified badge */}
-          {info?.is_approved && (
-            <div className="mt-5 flex items-center gap-1.5 bg-green-50 text-green-700 text-xs font-semibold px-4 py-1.5 rounded-full">
-              <CheckCircle size={13} /> Verified Company
-            </div>
-          )}
         </div>
 
         {/* Right — Details */}
@@ -163,7 +150,7 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
                 {[
                   { key: 'company_name', label: 'Company Name' },
                   { key: 'industry', label: 'Industry' },
-                  { key: 'company_size', label: 'Company Size', placeholder: 'e.g. 50-200 employees' },
+                  { key: 'company_size', label: 'Company Size', placeholder: 'e.g. 50–200 employees' },
                   { key: 'founded_year', label: 'Founded', placeholder: 'e.g. 2018' },
                   { key: 'website', label: 'Website', placeholder: 'e.g. company.io' },
                   { key: 'hq_location', label: 'HQ Location', placeholder: 'e.g. Prishtina, Kosovo' },
@@ -187,17 +174,19 @@ const CompanyProfileView = ({ companyInfo: initialInfo, onUpdate }) => {
           <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
             <h3 className="font-semibold text-gray-800 mb-4">Company Description</h3>
             {!isEditing ? (
-              <p className="text-sm text-gray-500 leading-relaxed">
+              <p className="text-sm text-gray-600 leading-relaxed whitespace-pre-wrap">
                 {info?.description || 'No description added yet. Click "Edit Profile" to add one.'}
               </p>
             ) : (
-              <textarea
-                rows={4}
-                placeholder="Describe your company, mission, culture..."
-                value={form.description || ''}
-                onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-none"
-              />
+              <>
+                <textarea
+                  style={{ minHeight: '140px' }}
+                  placeholder="Describe your company, mission, culture, and what makes it a great place to work."
+                  value={form.description || ''}
+                  onChange={e => setForm(f => ({ ...f, description: e.target.value }))}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-y leading-relaxed"
+                />
+              </>
             )}
           </div>
         </div>

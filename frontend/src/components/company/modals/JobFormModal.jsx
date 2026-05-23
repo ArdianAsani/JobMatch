@@ -37,6 +37,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
         await axiosInstance.post('/api/dashboard/jobs/create', payload)
       }
       onSuccess()
+      onClose()
     } catch (err) {
       setError(err.response?.data?.detail || 'Action failed. Please try again.')
     } finally {
@@ -46,7 +47,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
 
   return (
     <div className="fixed inset-0 bg-black/30 backdrop-blur-sm flex items-center justify-center z-50 p-4">
-      <div className="bg-white w-full max-w-xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
+      <div className="bg-white w-full max-w-2xl rounded-2xl shadow-2xl border border-gray-100 overflow-hidden">
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-5 border-b border-gray-100">
           <h2 className="text-lg font-bold text-gray-900">{isEdit ? 'Edit Position' : 'Post New Job'}</h2>
@@ -56,7 +57,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
         </div>
 
         {/* Form */}
-        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-4 max-h-[70vh] overflow-y-auto">
+        <form onSubmit={handleSubmit} className="px-6 py-5 space-y-5 max-h-[75vh] overflow-y-auto">
           {error && (
             <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">{error}</div>
           )}
@@ -101,7 +102,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
           {/* Salary + Deadline */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Salary (USD)</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Salary (USD/yr)</label>
               <input
                 type="number"
                 placeholder="e.g. 85000"
@@ -112,7 +113,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
               />
             </div>
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Deadline</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Application Deadline</label>
               <input
                 type="date"
                 value={form.deadline}
@@ -122,41 +123,47 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
             </div>
           </div>
 
-          {/* Skills Required */}
+          {/* Description — main AI semantic field */}
           <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Skills Required</label>
-            <input
-              type="text"
-              placeholder="e.g. React, TypeScript, Node.js"
-              value={form.skills_required}
-              onChange={set('skills_required')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition"
-            />
-          </div>
-
-          {/* Description */}
-          <div>
-            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Description *</label>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">
+              Description *
+            </label>
             <textarea
               required
-              rows={4}
-              placeholder="Describe the role and responsibilities..."
+              style={{ minHeight: '180px' }}
+              placeholder={`Describe the role, technologies, responsibilities, team environment, and project context.\n\nExample:\nLooking for a Frontend Developer experienced with React, TypeScript, TailwindCSS and modern dashboard applications. The candidate will build scalable UI systems and collaborate closely with backend engineers and designers.`}
               value={form.description}
               onChange={set('description')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-y leading-relaxed"
             />
+            <p className="text-xs text-gray-400 mt-1.5">
+              A detailed description improves the quality of AI candidate matching.
+            </p>
           </div>
 
           {/* Requirements */}
           <div>
             <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Requirements</label>
             <textarea
-              rows={3}
-              placeholder="List the qualifications and requirements..."
+              style={{ minHeight: '120px' }}
+              placeholder="List expectations, required technologies, years of experience, qualifications, or important skills."
               value={form.requirements}
               onChange={set('requirements')}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-none"
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-y leading-relaxed"
             />
+          </div>
+
+          {/* Skills Required */}
+          <div>
+            <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Skills Required</label>
+            <input
+              type="text"
+              placeholder="e.g. React, TypeScript, Node.js, PostgreSQL"
+              value={form.skills_required}
+              onChange={set('skills_required')}
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition"
+            />
+            <p className="text-xs text-gray-400 mt-1.5">Separate skills with commas.</p>
           </div>
         </form>
 

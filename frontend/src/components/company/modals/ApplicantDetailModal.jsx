@@ -1,6 +1,18 @@
-import { X, CheckCircle, XCircle, Clock, Eye, RotateCcw, Zap, Download } from 'lucide-react'
+import { X, CheckCircle, XCircle, Clock, Eye, RotateCcw, Download } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useState } from 'react'
+
+async function downloadCV(fileId, originalFilename) {
+  const res = await axiosInstance.get(`/api/files/cv/${fileId}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = originalFilename || 'cv'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 const STATUS_CONFIG = {
   Pending:       { color: 'bg-yellow-50 text-yellow-700', icon: Clock },
@@ -14,6 +26,7 @@ const ApplicantDetailModal = ({ app, onClose, onStatusUpdate }) => {
   const [isUpdating, setIsUpdating] = useState(false)
   const [currentStatus, setCurrentStatus] = useState(app.app_status)
   const [error, setError] = useState('')
+  const [downloadError, setDownloadError] = useState('')
 
   const skills = app.candidate_skills?.split(',').map(s => s.trim()).filter(Boolean) || []
   const initials = app.candidate_name?.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || '?'
@@ -65,14 +78,9 @@ const ApplicantDetailModal = ({ app, onClose, onStatusUpdate }) => {
               {app.candidate_headline && (
                 <p className="text-sm text-gray-400 mt-0.5">{app.candidate_headline}</p>
               )}
-              <div className="flex items-center gap-2 mt-1">
-                <span className="text-xs text-indigo-600 font-semibold uppercase tracking-tight">
-                  → {app.job_title}
-                </span>
-                <span className="inline-flex items-center gap-1 text-xs font-bold bg-green-50 text-green-700 px-2 py-0.5 rounded-full">
-                  <Zap size={10} /> {app.match_score}%
-                </span>
-              </div>
+              <span className="text-xs text-indigo-600 font-semibold uppercase tracking-tight mt-1 block">
+                → {app.job_title}
+              </span>
             </div>
           </div>
 
@@ -103,16 +111,22 @@ const ApplicantDetailModal = ({ app, onClose, onStatusUpdate }) => {
           )}
 
           {/* CV Download */}
-          {app.cv_file_path && (
-            <a
-              href={`${axiosInstance.defaults.baseURL}/${app.cv_file_path}`}
-              download={app.cv_filename}
-              target="_blank"
-              rel="noreferrer"
-              className="flex items-center justify-center gap-2 w-full py-2.5 border border-indigo-200 text-indigo-600 rounded-xl text-sm font-semibold hover:bg-indigo-50 transition"
-            >
-              <Download size={14} /> Download CV ({app.cv_filename})
-            </a>
+          {app.cv_file_id && (
+            <div>
+              <button
+                onClick={async () => {
+                  setDownloadError('')
+                  try { await downloadCV(app.cv_file_id, app.cv_filename) }
+                  catch { setDownloadError('Failed to download CV. Please try again.') }
+                }}
+                className="flex items-center justify-center gap-2 w-full py-2.5 border border-indigo-200 text-indigo-600 rounded-xl text-sm font-semibold hover:bg-indigo-50 transition"
+              >
+                <Download size={14} /> Download CV ({app.cv_filename})
+              </button>
+              {downloadError && (
+                <p className="text-xs text-red-500 mt-1.5 text-center">{downloadError}</p>
+              )}
+            </div>
           )}
 
           {/* Applied on */}

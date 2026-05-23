@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ClipboardList, Search, Calendar, Bookmark, Zap, Check, MapPin, Briefcase, ArrowRight } from 'lucide-react'
+import { ClipboardList, Search, Calendar, Bookmark, Check, ArrowRight } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -75,7 +75,6 @@ const CandidateOverview = ({ onNavigate }) => {
 
   const stats = data?.stats || {}
   const recentApps = data?.recent_applications || []
-  const recommended = data?.recommended_jobs || []
   const name = data?.candidate_info?.name?.split(' ')[0] || 'there'
 
   const STAT_CARDS = [
@@ -90,11 +89,9 @@ const CandidateOverview = ({ onNavigate }) => {
       {/* Welcome banner */}
       <div className="bg-[#1a2035] rounded-2xl p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
         <div>
-          <h2 className="text-white text-xl font-bold">Welcome back, {name}! 👋</h2>
+          <h2 className="text-white text-xl font-bold">Welcome back, {name}!</h2>
           <p className="text-slate-400 text-sm mt-1">
-            You have{' '}
-            <span className="text-indigo-400 font-semibold">{recommended.length} new job recommendations</span>
-            {stats.interviews > 0 && ` and ${stats.interviews} interview request${stats.interviews > 1 ? 's' : ''}`}
+            Here is an overview of your job search activity.
           </p>
         </div>
         <button
@@ -118,139 +115,50 @@ const CandidateOverview = ({ onNavigate }) => {
         ))}
       </div>
 
-      {/* Two-column layout */}
-      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
-        {/* Left — Application Status */}
-        <div className="lg:col-span-2 space-y-6">
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
-              <h3 className="font-bold text-gray-900">Application Status</h3>
+      {/* Application Status */}
+      <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+        <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+          <h3 className="font-bold text-gray-900">Application Status</h3>
+          <button
+            onClick={() => onNavigate('applications')}
+            className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1"
+          >
+            View all <ArrowRight size={12} />
+          </button>
+        </div>
+        <div className="divide-y divide-gray-50">
+          {recentApps.length === 0 ? (
+            <div className="px-6 py-12 text-center">
+              <p className="text-sm text-gray-400">No applications yet.</p>
               <button
-                onClick={() => onNavigate('applications')}
-                className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1"
+                onClick={() => onNavigate('browse')}
+                className="mt-3 text-xs text-indigo-600 font-semibold hover:underline"
               >
-                View all <ArrowRight size={12} />
+                Browse open jobs →
               </button>
             </div>
-            <div className="divide-y divide-gray-50">
-              {recentApps.length === 0 && (
-                <p className="px-6 py-8 text-sm text-gray-400 text-center">No applications yet.</p>
-              )}
-              {recentApps.map(app => (
-                <div key={app.app_id} className="px-6 py-4">
-                  <div className="flex items-center gap-3 mb-1">
-                    <div className={`h-9 w-9 ${avatarColor(app.company_name)} rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0`}>
-                      {companyInitials(app.company_name)}
-                    </div>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between">
-                        <p className="font-semibold text-sm text-gray-900 truncate">{app.job_title}</p>
-                        <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2 shrink-0 ${STATUS_BADGE[app.status] || 'bg-gray-100 text-gray-600'}`}>
-                          {app.status}
-                        </span>
-                      </div>
-                      <p className="text-xs text-gray-400">{app.company_name}</p>
-                    </div>
+          ) : (
+            recentApps.map(app => (
+              <div key={app.app_id} className="px-6 py-4">
+                <div className="flex items-center gap-3 mb-1">
+                  <div className={`h-9 w-9 ${avatarColor(app.company_name)} rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0`}>
+                    {companyInitials(app.company_name)}
                   </div>
-                  <PipelineTracker status={app.status} />
+                  <div className="flex-1 min-w-0">
+                    <div className="flex items-center justify-between">
+                      <p className="font-semibold text-sm text-gray-900 truncate">{app.job_title}</p>
+                      <span className={`text-xs font-semibold px-2.5 py-0.5 rounded-full ml-2 shrink-0 ${STATUS_BADGE[app.status] || 'bg-gray-100 text-gray-600'}`}>
+                        {app.status}
+                      </span>
+                    </div>
+                    <p className="text-xs text-gray-400">{app.company_name} · {app.applied_at_formatted}</p>
+                  </div>
                 </div>
-              ))}
-            </div>
-          </div>
-
-          {/* Recommended for You */}
-          {recommended.length > 0 && (
-            <div>
-              <div className="flex items-center justify-between mb-4">
-                <div>
-                  <h3 className="font-bold text-gray-900">Recommended for You</h3>
-                  <p className="text-xs text-gray-400">Based on your profile and AI match score</p>
-                </div>
-                <button
-                  onClick={() => onNavigate('browse')}
-                  className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1"
-                >
-                  Browse all jobs <ArrowRight size={12} />
-                </button>
+                <PipelineTracker status={app.status} />
               </div>
-              <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
-                {recommended.map(job => (
-                  <MiniJobCard key={job.id} job={job} onNavigate={onNavigate} />
-                ))}
-              </div>
-            </div>
+            ))
           )}
         </div>
-
-        {/* Right column */}
-        <div className="space-y-5">
-          {/* Profile Strength */}
-          <ProfileStrengthCard candidateInfo={data?.candidate_info} />
-
-        </div>
-      </div>
-    </div>
-  )
-}
-
-const ProfileStrengthCard = ({ candidateInfo }) => {
-  const BARS = [
-    { label: 'Overall Score', pct: 78, color: 'bg-indigo-600', bold: true },
-    { label: 'Skills',        pct: 90, color: 'bg-green-500' },
-    { label: 'Experience',    pct: 75, color: 'bg-indigo-600' },
-    { label: 'Education',     pct: 85, color: 'bg-indigo-600' },
-    { label: 'Portfolio',     pct: 60, color: 'bg-orange-400' },
-  ]
-  return (
-    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
-      <h3 className="font-bold text-gray-900 text-sm mb-4">Profile Strength</h3>
-      <div className="space-y-3">
-        {BARS.map(({ label, pct, color, bold }) => (
-          <div key={label}>
-            <div className="flex justify-between mb-1">
-              <span className="text-xs text-gray-500">{label}</span>
-              <span className={`text-xs font-bold ${bold ? 'text-indigo-600' : 'text-gray-700'}`}>{pct}%</span>
-            </div>
-            <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-              <div className={`h-full ${color} rounded-full`} style={{ width: `${pct}%` }} />
-            </div>
-          </div>
-        ))}
-      </div>
-    </div>
-  )
-}
-
-const MiniJobCard = ({ job, onNavigate }) => {
-  const initials = companyInitials(job.company_name)
-  const color = avatarColor(job.company_name)
-  const matchColor = job.match_score >= 90 ? 'bg-green-50 text-green-700' : job.match_score >= 80 ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'
-
-  return (
-    <div className="bg-white rounded-xl p-4 border border-gray-100 shadow-sm hover:shadow-md transition">
-      <div className="flex items-start justify-between mb-2">
-        <div className="flex items-center gap-2">
-          <div className={`h-8 w-8 ${color} rounded-lg flex items-center justify-center text-white text-xs font-bold`}>{initials}</div>
-          <div>
-            <p className="text-xs font-bold text-gray-900 line-clamp-1">{job.title}</p>
-            <p className="text-[10px] text-gray-400">{job.company_name}</p>
-          </div>
-        </div>
-      </div>
-      <div className="flex flex-wrap gap-1 mb-2">
-        {job.location && <span className="flex items-center gap-0.5 text-[10px] text-gray-400"><MapPin size={9}/>{job.location}</span>}
-        {job.job_type && <span className="flex items-center gap-0.5 text-[10px] text-gray-400 ml-1"><Briefcase size={9}/>{job.job_type}</span>}
-      </div>
-      <div className="flex items-center justify-between">
-        <span className={`inline-flex items-center gap-1 text-[10px] font-bold px-2 py-0.5 rounded-full ${matchColor}`}>
-          <Zap size={9}/>{job.match_score}% Match
-        </span>
-        <button
-          onClick={() => onNavigate('browse')}
-          className="text-[10px] font-semibold text-indigo-600 hover:underline"
-        >
-          Apply →
-        </button>
       </div>
     </div>
   )

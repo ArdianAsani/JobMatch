@@ -19,7 +19,6 @@ from datetime import datetime, timezone
 from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func
-import random
 
 from app.database import get_db
 from app.models import JobListing, Application, CandidateProfile, CompanyProfile, User
@@ -70,11 +69,6 @@ def _time_ago(dt) -> str:
     return f"{weeks} weeks ago"
 
 
-def _match_score(job_id: int) -> int:
-    random.seed(job_id + 42)
-    return random.randint(75, 98)
-
-
 def _saved_ids_for(db: Session, candidate: CandidateProfile) -> set:
     rows = db.query(SavedJob.job_id).filter(
         SavedJob.candidate_id == candidate.id
@@ -93,7 +87,6 @@ def _app_counts(db: Session) -> dict:
 def _build_job_dict(row, saved_ids: set, counts: dict) -> dict:
     d = dict(row._mapping)
     jid = d["id"]
-    d["match_score"] = _match_score(jid)
     d["applicant_count"] = counts.get(jid, 0)
     d["is_saved"] = jid in saved_ids
     d["posted_ago"] = _time_ago(d.pop("created_at", None))
@@ -153,7 +146,6 @@ def get_candidate_overview(
     recent_apps = []
     for row in recent_rows:
         d = dict(row._mapping)
-        d["match_score"] = _match_score(d["app_id"] + 13)
         at = d.pop("applied_at")
         d["applied_at_formatted"] = at.strftime("Applied %b %d, %Y") if at else ""
         recent_apps.append(d)
@@ -178,7 +170,7 @@ def get_candidate_overview(
     saved_ids = _saved_ids_for(db, candidate)
     counts = _app_counts(db)
     all_jobs = [_build_job_dict(r, saved_ids, counts) for r in job_rows]
-    recommended = sorted(all_jobs, key=lambda j: -j["match_score"])[:3]
+    recommended = sorted(all_jobs, key=lambda j: -j["applicant_count"])[:3]
 
     return {
         "candidate_info": {
@@ -211,15 +203,6 @@ def get_candidate_profile(
     candidate = _get_candidate_or_404(db, user_id)
     user = db.query(User).filter(User.id == user_id).first()
 
-    # Compute profile strength
-    fields = [
-        candidate.headline, candidate.summary, candidate.skills,
-        candidate.phone, candidate.location, candidate.desired_role,
-        candidate.expected_salary,
-    ]
-    filled = sum(1 for f in fields if f)
-    overall_pct = round((filled / len(fields)) * 100)
-
     # Fetch current CV file info if one has been uploaded
     cv_filename = None
     cv_uploaded_at = None
@@ -233,16 +216,12 @@ def get_candidate_profile(
         "name": user.name if user else "",
         "email": user.email if user else "",
         "headline": candidate.headline,
-        "summary": candidate.summary,
+        "professional_summary": candidate.professional_summary,
         "skills": candidate.skills,
         "experience_level": candidate.experience_level,
-        "education": candidate.education,
         "phone": candidate.phone,
         "location": candidate.location,
         "linkedin_url": candidate.linkedin_url,
-        "desired_role": candidate.desired_role,
-        "expected_salary": candidate.expected_salary,
-        "profile_strength": overall_pct,
         "cv_file_id": candidate.cv_file_id,
         "cv_filename": cv_filename,
         "cv_uploaded_at": cv_uploaded_at,
@@ -375,7 +354,6 @@ def get_my_applications(
     apps = []
     for row in results:
         d = dict(row._mapping)
-        d["match_score"] = _match_score(d["app_id"] + 55)
         at = d.pop("applied_at")
         d["applied_at_formatted"] = at.strftime("Applied %b %d, %Y") if at else ""
         apps.append(d)

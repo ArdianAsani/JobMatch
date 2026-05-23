@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { Search, Zap, Download } from 'lucide-react'
+import { Search, Download } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 import ApplicantDetailModal from '../modals/ApplicantDetailModal'
@@ -14,13 +14,16 @@ const STATUS_COLORS = {
   Rejected:      'bg-red-50 text-red-600',
 }
 
-const MatchBadge = ({ score }) => {
-  const color = score >= 90 ? 'bg-green-50 text-green-700' : score >= 80 ? 'bg-teal-50 text-teal-700' : 'bg-amber-50 text-amber-700'
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-bold px-2.5 py-0.5 rounded-full ${color}`}>
-      <Zap size={10} /> {score}% Match
-    </span>
-  )
+async function downloadCV(fileId, originalFilename) {
+  const res = await axiosInstance.get(`/api/files/cv/${fileId}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = originalFilename || 'cv'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
 }
 
 const ApplicantsView = () => {
@@ -28,6 +31,8 @@ const ApplicantsView = () => {
   const [applicants, setApplicants] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [error, setError] = useState('')
+  const [statusError, setStatusError] = useState('')
+  const [downloadError, setDownloadError] = useState('')
   const [search, setSearch] = useState('')
   const [statusFilter, setStatusFilter] = useState('All Statuses')
   const [selectedApp, setSelectedApp] = useState(null)
@@ -48,11 +53,21 @@ const ApplicantsView = () => {
   useEffect(() => { fetchApplicants() }, []) // eslint-disable-line
 
   const handleStatusChange = async (appId, newStatus) => {
+    setStatusError('')
     try {
       await axiosInstance.put(`/api/dashboard/applications/status/${appId}`, { status: newStatus })
       setApplicants(prev => prev.map(a => a.app_id === appId ? { ...a, app_status: newStatus } : a))
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to update status')
+      setStatusError(err.response?.data?.detail || 'Failed to update status')
+    }
+  }
+
+  const handleDownload = async (fileId, filename) => {
+    setDownloadError('')
+    try {
+      await downloadCV(fileId, filename)
+    } catch {
+      setDownloadError('Failed to download CV. Please try again.')
     }
   }
 
@@ -91,8 +106,10 @@ const ApplicantsView = () => {
         </select>
       </div>
 
-      {/* Error */}
-      {error && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-5 py-3">{error}</div>}
+      {/* Errors */}
+      {error        && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-5 py-3">{error}</div>}
+      {statusError  && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-5 py-3">{statusError}</div>}
+      {downloadError && <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-5 py-3">{downloadError}</div>}
 
       {/* Table */}
       <div className="bg-white rounded-2xl shadow-sm border border-gray-100 overflow-hidden">
@@ -108,7 +125,6 @@ const ApplicantsView = () => {
                 <th className="px-6 py-3 text-left">Applied Role</th>
                 <th className="px-6 py-3 text-left">Applied On</th>
                 <th className="px-6 py-3 text-left">Skills</th>
-                <th className="px-6 py-3 text-left">Match</th>
                 <th className="px-6 py-3 text-left">Status</th>
                 <th className="px-6 py-3 text-left">Actions</th>
               </tr>
@@ -141,8 +157,6 @@ const ApplicantsView = () => {
                         {skills.length === 0 && <span className="text-gray-300 text-xs">—</span>}
                       </div>
                     </td>
-                    {/* Match */}
-                    <td className="px-6 py-4"><MatchBadge score={app.match_score} /></td>
                     {/* Status inline select */}
                     <td className="px-6 py-4">
                       <select
@@ -164,16 +178,13 @@ const ApplicantsView = () => {
                         >
                           View
                         </button>
-                        {app.cv_file_path ? (
-                          <a
-                            href={`${axiosInstance.defaults.baseURL}/${app.cv_file_path}`}
-                            download={app.cv_filename}
-                            target="_blank"
-                            rel="noreferrer"
+                        {app.cv_file_id ? (
+                          <button
+                            onClick={() => handleDownload(app.cv_file_id, app.cv_filename)}
                             className="inline-flex items-center gap-1 text-xs border border-indigo-200 text-indigo-600 px-3 py-1.5 rounded-lg hover:bg-indigo-50 transition"
                           >
                             <Download size={11} /> CV
-                          </a>
+                          </button>
                         ) : (
                           <span className="text-xs border border-gray-100 text-gray-300 px-3 py-1.5 rounded-lg cursor-not-allowed">
                             No CV
@@ -186,7 +197,7 @@ const ApplicantsView = () => {
               })}
               {filtered.length === 0 && (
                 <tr>
-                  <td colSpan={7} className="px-6 py-16 text-center text-sm text-gray-400 italic">
+                  <td colSpan={6} className="px-6 py-16 text-center text-sm text-gray-400 italic">
                     {search || statusFilter !== 'All Statuses' ? 'No results match your filters' : 'No applicants yet'}
                   </td>
                 </tr>

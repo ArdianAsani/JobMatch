@@ -15,8 +15,8 @@ class CandidateProfile(Base):
     # Titulli i shkurtër profesional (p.sh. "Software Engineer")
     headline = Column(String(255))
 
-    # Përshkrim i shkurtër mbi kandidatin
-    summary = Column(Text)
+    # Përshkrim profesional — fusha kryesore për SBERT semantic matching
+    professional_summary = Column(Text)
 
     # Aftësitë teknike/profesionale të kandidatit (ruhen si tekst)
     skills = Column(Text)
@@ -24,17 +24,10 @@ class CandidateProfile(Base):
     # Niveli i përvojës (p.sh. "Junior", "Mid-level", "Senior")
     experience_level = Column(String(100))
 
-    education = Column(Text)
-
-    # Teksti i CV-së i ngarkuar — mund të përdoret nga algoritmi ML për matching
-    resume_text = Column(Text)
-
-    # Kontakti dhe preferencat e punës
+    # Kontakti
     phone = Column(String(50))
     location = Column(String(200))
     linkedin_url = Column(String(300))
-    desired_role = Column(String(150))
-    expected_salary = Column(String(100))
 
     # FK to files.id — set after candidate uploads a CV; auto-attached to new applications
     cv_file_id = Column(Integer, ForeignKey("files.id"), nullable=True)

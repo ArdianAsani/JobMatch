@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { MapPin, Briefcase, Zap, Bookmark } from 'lucide-react'
+import { MapPin, Briefcase, Bookmark } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 
 const AVATAR_COLORS = [
@@ -16,20 +16,11 @@ const formatSalary = (salary) => {
   return `$${Math.round(salary / 1000)}k/yr`
 }
 
-const MatchBadge = ({ score }) => {
-  const cls = score >= 90 ? 'bg-green-50 text-green-700'
-    : score >= 80 ? 'bg-teal-50 text-teal-700'
-    : 'bg-amber-50 text-amber-700'
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cls}`}>
-      <Zap size={10} /> {score}% Match
-    </span>
-  )
-}
-
 const SavedJobsView = () => {
   const [jobs, setJobs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [applySuccess, setApplySuccess] = useState('')
+  const [applyError, setApplyError] = useState('')
 
   const fetchSaved = async () => {
     setIsLoading(true)
@@ -50,11 +41,14 @@ const SavedJobsView = () => {
   }
 
   const handleApply = async (jobId) => {
+    setApplyError('')
+    setApplySuccess('')
     try {
       await axiosInstance.post('/api/dashboard/applications/create', { job_id: jobId })
-      alert('Application submitted!')
+      setApplySuccess('Application submitted successfully.')
+      fetchSaved()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to apply.')
+      setApplyError(err.response?.data?.detail || 'Failed to apply.')
     }
   }
 
@@ -66,6 +60,17 @@ const SavedJobsView = () => {
           {jobs.length} saved position{jobs.length !== 1 ? 's' : ''}
         </p>
       </div>
+
+      {applySuccess && (
+        <div className="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3">
+          {applySuccess}
+        </div>
+      )}
+      {applyError && (
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">
+          {applyError}
+        </div>
+      )}
 
       {isLoading ? (
         <div className="text-center py-16 text-sm text-gray-400 animate-pulse">Loading...</div>
@@ -97,7 +102,7 @@ const SavedJobsView = () => {
                     title="Remove from saved"
                     className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-red-50 transition"
                   >
-                    <Bookmark size={15} className="text-red-500 fill-red-500" />
+                    <Bookmark size={15} className="text-indigo-500 fill-indigo-500" />
                   </button>
                 </div>
 
@@ -122,7 +127,9 @@ const SavedJobsView = () => {
                 )}
 
                 <div className="flex items-center justify-between mt-auto">
-                  <MatchBadge score={job.match_score} />
+                  <span className="text-xs text-gray-400">
+                    {job.applicant_count} applicant{job.applicant_count !== 1 ? 's' : ''}
+                  </span>
                   <button
                     onClick={() => handleApply(job.id)}
                     className="bg-indigo-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:bg-indigo-700 transition"
@@ -131,9 +138,7 @@ const SavedJobsView = () => {
                   </button>
                 </div>
 
-                <p className="text-xs text-gray-300 mt-2.5">
-                  Posted {job.posted_ago} · {job.applicant_count} applicants
-                </p>
+                <p className="text-xs text-gray-300 mt-2.5">Posted {job.posted_ago}</p>
               </div>
             )
           })}

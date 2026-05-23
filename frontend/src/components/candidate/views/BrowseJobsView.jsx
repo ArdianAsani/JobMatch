@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Briefcase, Zap, Bookmark, ChevronDown } from 'lucide-react'
+import { MapPin, Briefcase, Bookmark, ChevronDown } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 
 const AVATAR_COLORS = [
@@ -13,9 +13,8 @@ const companyInitials = (name = '') =>
 
 const JOB_TYPES = ['All', 'Full-time', 'Part-time', 'Remote', 'Contract', 'Internship']
 const CATEGORY_PILLS = ['All', 'Engineering', 'Product', 'Design', 'Data', 'Marketing']
-const SORT_OPTIONS = ['Best Match', 'Latest', 'Salary High-Low', 'Salary Low-High']
+const SORT_OPTIONS = ['Latest', 'Salary High-Low', 'Salary Low-High']
 
-// Maps each category pill to job-title keywords for client-side filtering
 const CATEGORY_KEYWORDS = {
   Engineering: ['engineer', 'developer', 'devops', 'backend', 'frontend', 'fullstack'],
   Product:     ['product', 'manager', 'pm', 'owner'],
@@ -28,17 +27,6 @@ const formatSalary = (salary) => {
   if (!salary) return null
   const k = Math.round(salary / 1000)
   return `$${k}k/yr`
-}
-
-const MatchBadge = ({ score }) => {
-  const cls = score >= 90 ? 'bg-green-50 text-green-700'
-    : score >= 80 ? 'bg-teal-50 text-teal-700'
-    : 'bg-amber-50 text-amber-700'
-  return (
-    <span className={`inline-flex items-center gap-1 text-xs font-semibold px-2.5 py-1 rounded-full ${cls}`}>
-      <Zap size={10} /> {score}% Match
-    </span>
-  )
 }
 
 const JobCard = ({ job, onApply, onToggleSave }) => {
@@ -64,7 +52,7 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
         >
           <Bookmark
             size={15}
-            className={job.is_saved ? 'text-red-500 fill-red-500' : 'text-gray-300'}
+            className={job.is_saved ? 'text-indigo-500 fill-indigo-500' : 'text-gray-300'}
           />
         </button>
       </div>
@@ -90,7 +78,9 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
       )}
 
       <div className="flex items-center justify-between mt-auto">
-        <MatchBadge score={job.match_score} />
+        <span className="text-xs text-gray-400">
+          {job.applicant_count} applicant{job.applicant_count !== 1 ? 's' : ''}
+        </span>
         <button
           onClick={() => onApply(job.id)}
           className="bg-indigo-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:bg-indigo-700 transition"
@@ -99,9 +89,7 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
         </button>
       </div>
 
-      <p className="text-xs text-gray-300 mt-2.5">
-        Posted {job.posted_ago} · {job.applicant_count} applicants
-      </p>
+      <p className="text-xs text-gray-300 mt-2.5">Posted {job.posted_ago}</p>
     </div>
   )
 }
@@ -109,11 +97,14 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
 const BrowseJobsView = () => {
   const [jobs, setJobs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
+  const [applyingId, setApplyingId] = useState(null)
+  const [applyError, setApplyError] = useState('')
+  const [applySuccess, setApplySuccess] = useState('')
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
-  const [sortBy, setSortBy] = useState('Best Match')
+  const [sortBy, setSortBy] = useState('Latest')
 
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
@@ -127,11 +118,17 @@ const BrowseJobsView = () => {
   useEffect(() => { fetchJobs() }, [fetchJobs])
 
   const handleApply = async (jobId) => {
+    setApplyingId(jobId)
+    setApplyError('')
+    setApplySuccess('')
     try {
       await axiosInstance.post('/api/dashboard/applications/create', { job_id: jobId })
-      alert('Application submitted!')
+      setApplySuccess('Application submitted successfully.')
+      fetchJobs()
     } catch (err) {
-      alert(err.response?.data?.detail || 'Failed to apply.')
+      setApplyError(err.response?.data?.detail || 'Failed to apply.')
+    } finally {
+      setApplyingId(null)
     }
   }
 
@@ -163,7 +160,6 @@ const BrowseJobsView = () => {
   })
 
   const sorted = [...filtered].sort((a, b) => {
-    if (sortBy === 'Best Match') return b.match_score - a.match_score
     if (sortBy === 'Salary High-Low') return (b.salary || 0) - (a.salary || 0)
     if (sortBy === 'Salary Low-High') return (a.salary || 0) - (b.salary || 0)
     return 0
@@ -178,7 +174,6 @@ const BrowseJobsView = () => {
             {sorted.length} job{sorted.length !== 1 ? 's' : ''} match your search
           </p>
         </div>
-        {/* Sort */}
         <div className="relative">
           <select
             value={sortBy}
@@ -190,6 +185,18 @@ const BrowseJobsView = () => {
           <ChevronDown size={14} className="absolute right-2.5 top-3 text-gray-400 pointer-events-none" />
         </div>
       </div>
+
+      {/* Feedback messages */}
+      {applySuccess && (
+        <div className="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3">
+          {applySuccess}
+        </div>
+      )}
+      {applyError && (
+        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">
+          {applyError}
+        </div>
+      )}
 
       {/* Filter bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">
@@ -270,7 +277,12 @@ const BrowseJobsView = () => {
       ) : (
         <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
           {sorted.map(job => (
-            <JobCard key={job.id} job={job} onApply={handleApply} onToggleSave={handleToggleSave} />
+            <JobCard
+              key={job.id}
+              job={job}
+              onApply={handleApply}
+              onToggleSave={handleToggleSave}
+            />
           ))}
         </div>
       )}

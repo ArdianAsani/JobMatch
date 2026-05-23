@@ -3,8 +3,6 @@
 import os
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from fastapi.staticfiles import StaticFiles
-from sqlalchemy import inspect as sa_inspect, text
 from app.database import engine, Base, SessionLocal
 from app.models import Role, User  # noqa: F401 — registers models with Base
 from app.routes.auth_routes import router as auth_router
@@ -39,20 +37,6 @@ app.add_middleware(
 Base.metadata.create_all(bind=engine)
 
 
-def migrate_db():
-    """Add columns that didn't exist when the DB was first created."""
-    insp = sa_inspect(engine)
-    cols = {c["name"] for c in insp.get_columns("candidate_profiles")}
-    if "cv_file_id" not in cols:
-        with engine.connect() as conn:
-            conn.execute(text(
-                "ALTER TABLE candidate_profiles "
-                "ADD COLUMN cv_file_id INT NULL, "
-                "ADD CONSTRAINT fk_cp_cv_file FOREIGN KEY (cv_file_id) REFERENCES files(id) ON DELETE SET NULL"
-            ))
-            conn.commit()
-
-
 def seed_roles():
     """
     Shton rolet bazë në databazë nëse nuk ekzistojnë ende.
@@ -70,19 +54,17 @@ def seed_roles():
 
 
 # Ekzekutohet menjëherë kur starton serveri
-migrate_db()
 seed_roles()
 
-# Serve uploaded files (CVs, etc.) as static files
-os.makedirs("uploads", exist_ok=True)
-app.mount("/uploads", StaticFiles(directory="uploads"), name="uploads")
+# Ensure the CV upload directory exists on startup
+os.makedirs("uploads/cv", exist_ok=True)
 
 # Regjistron route-t e aplikacionit — çdo router ka prefix-in e vet
 app.include_router(auth_router)        # /auth/...
 app.include_router(company_router)     # /api/dashboard/company/... & /jobs/... (COMPANY)
 app.include_router(candidate_router)   # /api/dashboard/jobs/all & /applications/... (CANDIDATE)
 app.include_router(admin_router)       # /api/admin/...
-app.include_router(upload_router)      # /api/upload/...
+app.include_router(upload_router)      # /api/files/...
 
 
 @app.get("/")

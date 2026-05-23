@@ -98,7 +98,7 @@ class StatsOut(BaseModel):
 
 
 class ApplicantOut(BaseModel):
-    """Aplikuesi i shfaqur në listën e kompanisë me match score dhe aftësi."""
+    """Aplikuesi i shfaqur në listën e kompanisë."""
     app_id: int
     app_status: str
     job_title: str
@@ -107,4 +107,3 @@ class ApplicantOut(BaseModel):
     candidate_summary: Optional[str] = None
     candidate_skills: Optional[str] = None
     applied_at_formatted: str
-    match_score: int

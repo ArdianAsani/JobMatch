@@ -1,7 +1,19 @@
 import { useState, useEffect, useRef } from 'react'
-import { Edit3, Save, X, MapPin, FileText, Upload, CheckCircle } from 'lucide-react'
+import { Edit3, Save, X, MapPin, FileText, Upload, CheckCircle, Sparkles, Download } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
+
+async function downloadCV(fileId, originalFilename) {
+  const res = await axiosInstance.get(`/api/files/cv/${fileId}`, { responseType: 'blob' })
+  const url = URL.createObjectURL(res.data)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = originalFilename || 'cv'
+  document.body.appendChild(a)
+  a.click()
+  a.remove()
+  URL.revokeObjectURL(url)
+}
 
 const Field = ({ label, value }) => (
   <div>
@@ -34,6 +46,7 @@ const CandidateProfileView = ({ onUpdate }) => {
   const [error, setError] = useState('')
   const [cvUploading, setCvUploading] = useState(false)
   const [cvError, setCvError] = useState('')
+  const [cvDownloading, setCvDownloading] = useState(false)
   const fileInputRef = useRef(null)
 
   const fetchProfile = async () => {
@@ -52,7 +65,7 @@ const CandidateProfileView = ({ onUpdate }) => {
     setIsSaving(true)
     setError('')
     try {
-      const { name, email, profile_strength, ...updatable } = form
+      const { name, email, profile_strength, cv_file_id, cv_filename, cv_uploaded_at, ...updatable } = form
       await axiosInstance.put('/api/dashboard/candidate/profile/update', updatable)
       await fetchProfile()
       setIsEditing(false)
@@ -72,11 +85,9 @@ const CandidateProfileView = ({ onUpdate }) => {
     try {
       const formData = new FormData()
       formData.append('file', file)
-      // Do NOT set Content-Type — browser sets multipart/form-data with boundary automatically
-      const res = await axiosInstance.post('/api/upload/cv', formData, {
+      await axiosInstance.post('/api/files/cv', formData, {
         headers: { 'Content-Type': undefined },
       })
-      // Refresh profile to show new cv_filename + cv_uploaded_at
       await fetchProfile()
     } catch (err) {
       setCvError(err.response?.data?.detail || 'Upload failed. Try again.')
@@ -91,7 +102,6 @@ const CandidateProfileView = ({ onUpdate }) => {
   }
 
   const initials = (profile.name || '').split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase() || 'CA'
-  const pct = profile.profile_strength || 0
 
   return (
     <div className="space-y-5 max-w-5xl">
@@ -140,19 +150,10 @@ const CandidateProfileView = ({ onUpdate }) => {
               <p className="text-sm text-gray-500 mt-1">{profile.headline}</p>
             )}
             {profile.location && (
-              <p className="text-xs text-gray-400 mt-1 flex items-center justify-center gap-1">
+              <p className="text-xs text-gray-400 mt-1.5 flex items-center justify-center gap-1">
                 <MapPin size={10} />{profile.location}
               </p>
             )}
-            <div className="mt-4">
-              <div className="flex justify-between text-xs mb-1">
-                <span className="text-gray-500">Profile Completion</span>
-                <span className="text-indigo-600 font-semibold">{pct}%</span>
-              </div>
-              <div className="h-1.5 bg-gray-100 rounded-full overflow-hidden">
-                <div className="h-full bg-indigo-600 rounded-full transition-all" style={{ width: `${pct}%` }} />
-              </div>
-            </div>
           </div>
 
           {/* Skills card */}
@@ -172,7 +173,7 @@ const CandidateProfileView = ({ onUpdate }) => {
                     {s.trim()}
                   </span>
                 ))}
-                {!profile.skills && <p className="text-xs text-gray-300">No skills added yet.</p>}
+                {!profile.skills && <p className="text-xs text-gray-300 italic">No skills added yet.</p>}
               </div>
             )}
           </div>
@@ -211,16 +212,28 @@ const CandidateProfileView = ({ onUpdate }) => {
           <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
             <h4 className="font-bold text-gray-900 mb-4">Resume / CV</h4>
 
-            {/* Current CV status */}
             {profile.cv_filename ? (
               <div className="flex items-center gap-3 mb-4 bg-green-50 border border-green-100 rounded-xl px-4 py-3">
                 <CheckCircle size={16} className="text-green-600 shrink-0" />
                 <div className="flex-1 min-w-0">
-                  <p className="text-sm font-semibold text-green-800 truncate">{profile.cv_filename}</p>
+                  <p className="text-sm font-semibold text-green-800 break-all">{profile.cv_filename}</p>
                   {profile.cv_uploaded_at && (
                     <p className="text-xs text-green-600">Uploaded {profile.cv_uploaded_at}</p>
                   )}
                 </div>
+                <button
+                  onClick={async () => {
+                    setCvDownloading(true)
+                    setCvError('')
+                    try { await downloadCV(profile.cv_file_id, profile.cv_filename) }
+                    catch { setCvError('Download failed. Please try again.') }
+                    finally { setCvDownloading(false) }
+                  }}
+                  disabled={cvDownloading}
+                  className="flex items-center gap-1.5 text-xs font-semibold text-green-700 border border-green-200 px-3 py-1.5 rounded-lg hover:bg-green-100 transition disabled:opacity-50 shrink-0"
+                >
+                  <Download size={12} />{cvDownloading ? '…' : 'Download'}
+                </button>
               </div>
             ) : (
               <div className="border-2 border-dashed border-gray-200 rounded-xl p-5 flex flex-col items-center justify-center gap-2 mb-4">
@@ -231,8 +244,7 @@ const CandidateProfileView = ({ onUpdate }) => {
               </div>
             )}
 
-            {/* Upload control — always visible */}
-            <div className="flex items-center gap-3">
+            <div className="flex flex-wrap items-center gap-3">
               <input
                 ref={fileInputRef}
                 type="file"
@@ -255,34 +267,45 @@ const CandidateProfileView = ({ onUpdate }) => {
             )}
           </div>
 
-          {/* Job Preferences */}
-          <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
-            <h4 className="font-bold text-gray-900 mb-4">Job Preferences</h4>
+          {/* Professional Profile — primary AI matching field */}
+          <div className="bg-white rounded-2xl border border-indigo-100 shadow-sm p-6">
+            <div className="flex items-center gap-2 mb-1">
+              <h4 className="font-bold text-gray-900">Professional Profile</h4>
+              <span className="flex items-center gap-1 text-xs font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+                <Sparkles size={10} /> AI Matching
+              </span>
+            </div>
+            <p className="text-xs text-gray-400 mb-4">
+              This text is used by our AI to match you with relevant jobs. Write clearly and in detail.
+            </p>
+
             {isEditing ? (
-              <div className="grid grid-cols-2 gap-4">
-                <Input label="Desired Role" value={form.desired_role} onChange={set('desired_role')} placeholder="Senior Frontend Developer" />
-                <Input label="Expected Salary" value={form.expected_salary} onChange={set('expected_salary')} placeholder="$120k–$150k" />
-                <Input label="Education" value={form.education} onChange={set('education')} placeholder="B.Sc. Computer Science" />
-                <div className="col-span-2">
-                  <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Summary</label>
-                  <textarea
-                    rows={3}
-                    placeholder="Brief professional summary..."
-                    value={form.summary || ''}
-                    onChange={e => setForm(f => ({ ...f, summary: e.target.value }))}
-                    className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-none"
-                  />
-                </div>
+              <div>
+                <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-2 block">
+                  Professional Summary
+                </label>
+                <textarea
+                  placeholder={`Describe your professional background, technologies, experience, projects, and career interests.\n\nExample:\nFrontend developer with experience in React, TypeScript, TailwindCSS and scalable dashboard applications. Built responsive UI systems and modern web platforms.`}
+                  value={form.professional_summary || ''}
+                  onChange={e => setForm(f => ({ ...f, professional_summary: e.target.value }))}
+                  style={{ minHeight: '200px' }}
+                  className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition resize-y leading-relaxed"
+                />
+                <p className="text-xs text-gray-400 mt-2">
+                  Tip: include technologies, project types, seniority, and domains you work in.
+                </p>
               </div>
             ) : (
-              <div className="grid grid-cols-2 gap-4">
-                <Field label="Desired Role" value={profile.desired_role} />
-                <Field label="Expected Salary" value={profile.expected_salary} />
-                <Field label="Education" value={profile.education} />
-                {profile.summary && (
-                  <div className="col-span-2">
-                    <p className="text-xs text-gray-400 mb-1">Summary</p>
-                    <p className="text-sm text-gray-700">{profile.summary}</p>
+              <div>
+                {profile.professional_summary ? (
+                  <div className="bg-gray-50 border border-gray-100 rounded-xl px-4 py-4">
+                    <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-wrap">{profile.professional_summary}</p>
+                  </div>
+                ) : (
+                  <div className="bg-indigo-50/40 border border-dashed border-indigo-200 rounded-xl px-4 py-6 text-center">
+                    <Sparkles size={18} className="text-indigo-300 mx-auto mb-2" />
+                    <p className="text-sm text-gray-500 font-medium">No professional summary yet.</p>
+                    <p className="text-xs text-gray-400 mt-1">Add a summary to enable AI-powered job matching.</p>
                   </div>
                 )}
               </div>

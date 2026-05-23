@@ -17,7 +17,6 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session
 from sqlalchemy import func as sqlfunc
 from datetime import datetime, timedelta
-import random
 
 from app.database import get_db
 from app.models import JobListing, Application, CandidateProfile, CompanyProfile, User
@@ -361,11 +360,11 @@ def get_company_applicants(
             Application.applied_at.label("applied_at"),
             JobListing.title.label("job_title"),
             CandidateProfile.headline.label("candidate_headline"),
-            CandidateProfile.summary.label("candidate_summary"),
+            CandidateProfile.professional_summary.label("candidate_summary"),
             CandidateProfile.skills.label("candidate_skills"),
             User.name.label("candidate_name"),
+            Application.cv_file_id.label("cv_file_id"),
             FileRecord.filename.label("cv_filename"),
-            FileRecord.file_path.label("cv_file_path"),
         )
         .join(JobListing, Application.job_id == JobListing.id)
         .join(CandidateProfile, Application.candidate_id == CandidateProfile.id)
@@ -379,10 +378,6 @@ def get_company_applicants(
     out = []
     for row in results:
         d = dict(row._mapping)
-        # Match score deterministik bazuar në app_id (pa ML të vërtetë)
-        random.seed(d["app_id"] + 100)
-        d["match_score"] = random.randint(72, 98)
-        # Formato datën si "Apr 28"
         applied_at = d.pop("applied_at", None)
         d["applied_at_formatted"] = (
             applied_at.strftime("%b %d") if applied_at else "—"
