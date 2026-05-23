@@ -51,7 +51,7 @@ const CandidateDashboard = () => {
       case 'dashboard':
         return <CandidateOverview onNavigate={setActiveSection} />
       case 'browse':
-        return <BrowseJobsView />
+        return <BrowseJobsView onNavigate={setActiveSection} />
       case 'applications':
         return <MyApplicationsView />
       case 'saved':

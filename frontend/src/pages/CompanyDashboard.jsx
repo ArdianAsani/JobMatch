@@ -23,6 +23,7 @@ import CompanyTopbar from '../components/company/CompanyTopbar'
 import CompanyOverview from '../components/company/views/CompanyOverview'
 import MyJobListings from '../components/company/views/MyJobListings'
 import ApplicantsView from '../components/company/views/ApplicantsView'
+import KanbanView from '../components/company/views/KanbanView'
 import CompanyProfileView from '../components/company/views/CompanyProfileView'
 
 const CompanyDashboard = () => {
@@ -55,6 +56,8 @@ const CompanyDashboard = () => {
         return <MyJobListings />
       case 'applicants':
         return <ApplicantsView />
+      case 'kanban':
+        return <KanbanView />
       case 'profile':
         return (
           <CompanyProfileView

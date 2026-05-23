@@ -1,9 +1,10 @@
-import { LayoutDashboard, Briefcase, Users, Building2 } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Users, Building2, LayoutGrid } from 'lucide-react'
 
 const NAV = [
   { key: 'dashboard',  label: 'Dashboard',       icon: LayoutDashboard },
   { key: 'jobs',       label: 'My Job Listings', icon: Briefcase },
   { key: 'applicants', label: 'Applicants',      icon: Users },
+  { key: 'kanban',     label: 'Kanban Board',    icon: LayoutGrid },
   { key: 'profile',    label: 'Company Profile', icon: Building2 },
 ]
 

@@ -10,6 +10,7 @@ from app.routes.company_routes import router as company_router
 from app.routes.candidate_routes import router as candidate_router
 from app.routes.admin_routes import router as admin_router
 from app.routes.upload_routes import router as upload_router
+from app.routes.public_routes import router as public_router
 from app.repositories import role_repository
 
 # Krijon instancën kryesore të aplikacionit FastAPI
@@ -65,6 +66,7 @@ app.include_router(company_router)     # /api/dashboard/company/... & /jobs/... 
 app.include_router(candidate_router)   # /api/dashboard/jobs/all & /applications/... (CANDIDATE)
 app.include_router(admin_router)       # /api/admin/...
 app.include_router(upload_router)      # /api/files/...
+app.include_router(public_router)      # /api/jobs/public (pa autentikim)
 
 
 @app.get("/")

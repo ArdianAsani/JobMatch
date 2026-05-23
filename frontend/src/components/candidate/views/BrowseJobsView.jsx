@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Briefcase, Bookmark, ChevronDown } from 'lucide-react'
+import { MapPin, Briefcase, Bookmark, ChevronDown, AlertTriangle, CheckCircle } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 
 const AVATAR_COLORS = [
@@ -94,17 +94,46 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
   )
 }
 
-const BrowseJobsView = () => {
+// ─── Toast ────────────────────────────────────────────────────────────────────
+const Toast = ({ toast }) => {
+  const isWarning = toast.type === 'warning'
+  return (
+    <div className={`fixed top-6 left-1/2 -translate-x-1/2 z-50 transition-all duration-300 ${
+      toast.visible ? 'opacity-100 translate-y-0' : 'opacity-0 -translate-y-3 pointer-events-none'
+    }`}>
+      <div className={`flex items-center gap-3 px-5 py-4 rounded-2xl shadow-xl border max-w-sm ${
+        isWarning
+          ? 'bg-white border-amber-200'
+          : 'bg-white border-green-200'
+      }`}>
+        <div className={`h-9 w-9 rounded-xl flex items-center justify-center shrink-0 ${
+          isWarning ? 'bg-amber-50' : 'bg-green-50'
+        }`}>
+          {isWarning
+            ? <AlertTriangle size={18} className="text-amber-500" />
+            : <CheckCircle size={18} className="text-green-500" />}
+        </div>
+        <div>
+          <p className="text-sm font-semibold text-gray-800">
+            {isWarning ? 'Profili i paplotë' : 'Sukses!'}
+          </p>
+          <p className="text-xs text-gray-500 mt-0.5">{toast.message}</p>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+const BrowseJobsView = ({ onNavigate }) => {
   const [jobs, setJobs] = useState([])
   const [isLoading, setIsLoading] = useState(true)
   const [applyingId, setApplyingId] = useState(null)
-  const [applyError, setApplyError] = useState('')
-  const [applySuccess, setApplySuccess] = useState('')
+  const [toast, setToast] = useState({ visible: false, message: '', type: 'warning' })
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
   const [typeFilter, setTypeFilter] = useState('All')
   const [categoryFilter, setCategoryFilter] = useState('All')
-  const [sortBy, setSortBy] = useState('Latest')
+  const [sortBy, setSortBy] = useState('Best Match')
 
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
@@ -117,16 +146,26 @@ const BrowseJobsView = () => {
 
   useEffect(() => { fetchJobs() }, [fetchJobs])
 
+  const showToast = (message, type = 'warning') => {
+    setToast({ visible: true, message, type })
+    setTimeout(() => setToast(t => ({ ...t, visible: false })), 3500)
+  }
+
   const handleApply = async (jobId) => {
     setApplyingId(jobId)
-    setApplyError('')
-    setApplySuccess('')
     try {
       await axiosInstance.post('/api/dashboard/applications/create', { job_id: jobId })
-      setApplySuccess('Application submitted successfully.')
+      showToast('Aplikimi u dërgua me sukses!', 'success')
       fetchJobs()
     } catch (err) {
-      setApplyError(err.response?.data?.detail || 'Failed to apply.')
+      const detail = err.response?.data?.detail
+      if (detail === 'PROFILE_INCOMPLETE') {
+        showToast('Ju lutem plotësoni profilin dhe ngarkoni CV-në para se të aplikoni!', 'warning')
+        // Ridrejto te profili pas 2.5 sekondash
+        setTimeout(() => { if (onNavigate) onNavigate('profile') }, 2500)
+      } else {
+        showToast(detail || 'Aplikimi dështoi. Provo sërish.', 'warning')
+      }
     } finally {
       setApplyingId(null)
     }
@@ -167,6 +206,8 @@ const BrowseJobsView = () => {
 
   return (
     <div className="space-y-5">
+      <Toast toast={toast} />
+
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-xl font-bold text-gray-900">Browse Jobs</h2>
@@ -186,17 +227,6 @@ const BrowseJobsView = () => {
         </div>
       </div>
 
-      {/* Feedback messages */}
-      {applySuccess && (
-        <div className="bg-green-50 border border-green-100 text-green-700 text-sm rounded-xl px-4 py-3">
-          {applySuccess}
-        </div>
-      )}
-      {applyError && (
-        <div className="bg-red-50 border border-red-100 text-red-600 text-sm rounded-xl px-4 py-3">
-          {applyError}
-        </div>
-      )}
 
       {/* Filter bar */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-5">

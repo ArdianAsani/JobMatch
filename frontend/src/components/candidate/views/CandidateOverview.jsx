@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ClipboardList, Search, Calendar, Bookmark, Check, ArrowRight } from 'lucide-react'
+import { ClipboardList, Search, Calendar, Bookmark, Check, ArrowRight, AlertCircle } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -57,6 +57,94 @@ const PipelineTracker = ({ status }) => {
   )
 }
 
+// ─── Profile Completion Card ──────────────────────────────────────────────────
+const ProfileCompletionCard = ({ completion, onNavigate }) => {
+  const { score, items } = completion
+  const missing = items.filter(i => !i.done)
+
+  const barColor =
+    score === 100 ? 'from-green-400 to-emerald-500' :
+    score >= 60   ? 'from-indigo-500 to-violet-500' :
+    score >= 30   ? 'from-amber-400 to-orange-400'  :
+                    'from-red-400 to-rose-400'
+
+  const scoreLabel =
+    score === 100 ? 'Profile complete!' :
+    score >= 60   ? 'Almost there!'     :
+    score >= 30   ? 'Getting started'   :
+                    'Just started'
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm p-6">
+      {/* Header row */}
+      <div className="flex items-start justify-between mb-5">
+        <div>
+          <h3 className="font-bold text-gray-900 text-base">Profile Completion</h3>
+          <p className="text-xs text-gray-400 mt-0.5">
+            A complete profile increases your match score significantly
+          </p>
+        </div>
+        <div className="flex flex-col items-center shrink-0 ml-4">
+          <span className={`text-3xl font-extrabold ${score === 100 ? 'text-green-500' : 'text-gray-800'}`}>
+            {score}%
+          </span>
+          <span className="text-[10px] text-gray-400 mt-0.5 whitespace-nowrap">{scoreLabel}</span>
+        </div>
+      </div>
+
+      {/* Progress bar */}
+      <div className="h-2.5 bg-gray-100 rounded-full overflow-hidden mb-5">
+        <div
+          className={`h-full bg-gradient-to-r ${barColor} rounded-full transition-all duration-700`}
+          style={{ width: `${score}%` }}
+        />
+      </div>
+
+      {/* Checklist */}
+      <div className="space-y-2.5">
+        {items.map(item => (
+          <div key={item.field} className="flex items-center gap-3">
+            <div className={`h-5 w-5 rounded-full flex items-center justify-center shrink-0 transition-colors ${
+              item.done ? 'bg-green-500' : 'bg-gray-100'
+            }`}>
+              {item.done
+                ? <Check size={10} className="text-white" />
+                : <span className="text-[9px] text-gray-400 font-bold leading-none">+{item.points}</span>
+              }
+            </div>
+            <span className={`text-sm flex-1 ${
+              item.done ? 'text-gray-400 line-through' : 'text-gray-700 font-medium'
+            }`}>
+              {item.label}
+            </span>
+            {!item.done && (
+              <span className="text-xs font-bold text-indigo-500">+{item.points}%</span>
+            )}
+          </div>
+        ))}
+      </div>
+
+      {/* CTA */}
+      {missing.length > 0 && (
+        <button
+          onClick={() => onNavigate('profile')}
+          className="mt-5 w-full flex items-center justify-center gap-2 bg-indigo-600 text-white text-sm font-semibold py-2.5 rounded-xl hover:bg-indigo-700 transition"
+        >
+          <AlertCircle size={15} />
+          Complete Profile — {100 - score}% remaining
+        </button>
+      )}
+      {missing.length === 0 && (
+        <div className="mt-5 flex items-center justify-center gap-2 bg-green-50 border border-green-100 text-green-600 text-sm font-semibold py-2.5 rounded-xl">
+          <Check size={15} />
+          Your profile is 100% complete!
+        </div>
+      )}
+    </div>
+  )
+}
+
+// ─── Main Overview ────────────────────────────────────────────────────────────
 const CandidateOverview = ({ onNavigate }) => {
   const { user } = useAuth()
   const [data, setData] = useState(null)
@@ -75,6 +163,7 @@ const CandidateOverview = ({ onNavigate }) => {
 
   const stats = data?.stats || {}
   const recentApps = data?.recent_applications || []
+  const completion = data?.profile_completion || null
   const name = data?.candidate_info?.name?.split(' ')[0] || 'there'
 
   const STAT_CARDS = [
@@ -114,6 +203,11 @@ const CandidateOverview = ({ onNavigate }) => {
           </div>
         ))}
       </div>
+
+      {/* Profile Completion */}
+      {completion && (
+        <ProfileCompletionCard completion={completion} onNavigate={onNavigate} />
+      )}
 
       {/* Application Status */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

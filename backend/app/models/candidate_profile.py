@@ -16,7 +16,7 @@ class CandidateProfile(Base):
     headline = Column(String(255))
 
     # Përshkrim profesional — fusha kryesore për SBERT semantic matching
-    professional_summary = Column(Text)
+    professional_summary = Column('summary', Text)
 
     # Aftësitë teknike/profesionale të kandidatit (ruhen si tekst)
     skills = Column(Text)

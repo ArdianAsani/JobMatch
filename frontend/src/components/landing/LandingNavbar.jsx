@@ -23,8 +23,8 @@ export function Logo({ light }) {
 }
 
 const navLinks = [
-  { label: 'Find Jobs', to: '#' },
-  { label: 'Post a Job', to: '#' },
+  { label: 'Find Jobs', to: '/find-jobs' },
+  { label: 'Post a Job', to: '/register' },
   { label: 'About', to: '/about' },
 ]
 

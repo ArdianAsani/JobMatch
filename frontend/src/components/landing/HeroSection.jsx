@@ -1,4 +1,5 @@
 import { useState } from 'react'
+import { useNavigate } from 'react-router-dom'
 
 function SearchIcon({ className }) {
   return (
@@ -11,6 +12,18 @@ function SearchIcon({ className }) {
 export default function HeroSection() {
   const [query, setQuery] = useState('')
   const [location, setLocation] = useState('')
+  const navigate = useNavigate()
+
+  const handleSearch = () => {
+    const params = new URLSearchParams()
+    if (query.trim()) params.set('q', query.trim())
+    if (location.trim()) params.set('location', location.trim())
+    navigate(`/find-jobs${params.toString() ? `?${params}` : ''}`)
+  }
+
+  const handleKey = (e) => {
+    if (e.key === 'Enter') handleSearch()
+  }
 
   return (
     <section className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-purple-50 to-white pt-20 pb-28">
@@ -49,6 +62,7 @@ export default function HeroSection() {
               className="flex-1 outline-none text-gray-600 text-sm placeholder-gray-400 py-2"
               value={query}
               onChange={e => setQuery(e.target.value)}
+              onKeyDown={handleKey}
             />
           </div>
           <div className="hidden md:block w-px bg-gray-200 my-2" />
@@ -60,9 +74,13 @@ export default function HeroSection() {
               className="flex-1 outline-none text-gray-600 text-sm placeholder-gray-400 py-2 w-full"
               value={location}
               onChange={e => setLocation(e.target.value)}
+              onKeyDown={handleKey}
             />
           </div>
-          <button className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap">
+          <button
+            onClick={handleSearch}
+            className="bg-indigo-600 text-white px-8 py-3 rounded-xl font-semibold text-sm hover:bg-indigo-700 transition-colors whitespace-nowrap"
+          >
             Search Jobs
           </button>
         </div>

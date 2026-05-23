@@ -95,6 +95,25 @@ def _build_job_dict(row, saved_ids: set, counts: dict) -> dict:
     return d
 
 
+# ─── HELPERS (profile completion) ────────────────────────────────────────────
+
+def _compute_completion(candidate: CandidateProfile) -> dict:
+    checks = [
+        ("headline",             candidate.headline,             20, "Add a professional headline"),
+        ("professional_summary", candidate.professional_summary, 20, "Write a professional summary"),
+        ("skills",               candidate.skills,               30, "Add your skills"),
+        ("cv",                   candidate.cv_file_id,           30, "Upload your CV"),
+    ]
+    score = 0
+    items = []
+    for field, value, points, label in checks:
+        done = bool(value)
+        if done:
+            score += points
+        items.append({"field": field, "label": label, "points": points, "done": done})
+    return {"score": score, "items": items}
+
+
 # ─── GET /candidate/overview/{user_id} ───────────────────────────────────────
 
 @router.get("/candidate/overview/{user_id}")
@@ -185,6 +204,7 @@ def get_candidate_overview(
         },
         "recent_applications": recent_apps,
         "recommended_jobs": recommended,
+        "profile_completion": _compute_completion(candidate),
     }
 
 
@@ -298,6 +318,18 @@ def create_application(
         raise HTTPException(
             status_code=400,
             detail="This job is no longer active and cannot receive applications",
+        )
+
+    # Blloko aplikimin nëse profili ka fusha të detyrueshme të zbrazëta ose CV mungon
+    missing = []
+    if not candidate.headline: missing.append("headline")
+    if not candidate.professional_summary: missing.append("summary")
+    if not candidate.skills:   missing.append("skills")
+    if not candidate.cv_file_id: missing.append("cv")
+    if missing:
+        raise HTTPException(
+            status_code=400,
+            detail="PROFILE_INCOMPLETE",
         )
 
     existing = db.query(Application).filter(

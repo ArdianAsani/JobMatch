@@ -5,6 +5,7 @@ import Landing from "./pages/Landing";
 import About from "./pages/About";
 import Login from "./pages/Login";
 import Register from "./pages/Register";
+import FindJobs from "./pages/FindJobs";
 import AdminDashboard from "./pages/AdminDashboard";
 import CompanyDashboard from "./pages/CompanyDashboard";
 import CandidateDashboard from "./pages/CandidateDashboard";
@@ -19,6 +20,7 @@ function App() {
           {/* Public routes */}
           <Route path="/" element={<Landing />} />
           <Route path="/about" element={<About />} />
+          <Route path="/find-jobs" element={<FindJobs />} />
           <Route path="/login" element={<Login />} />
           <Route path="/register" element={<Register />} />
 

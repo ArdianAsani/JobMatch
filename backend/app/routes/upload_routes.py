@@ -123,11 +123,12 @@ async def download_cv(
     else:
         raise HTTPException(status_code=403, detail="Access denied")
 
-    disk_path = f"{CV_UPLOAD_DIR}/{file_record.file_path}"
+    # os.path.basename handles both legacy full-path entries and new UUID-only entries
+    disk_path = os.path.join(CV_UPLOAD_DIR, os.path.basename(file_record.file_path))
     if not os.path.exists(disk_path):
         raise HTTPException(status_code=404, detail="File not found on disk")
 
-    ext = os.path.splitext(file_record.file_path)[1].lower()
+    ext = os.path.splitext(os.path.basename(file_record.file_path))[1].lower()
     media_type = MIME_TYPES.get(ext, "application/octet-stream")
 
     return FileResponse(
