@@ -26,6 +26,7 @@ from app.models.saved_job import SavedJob
 from app.models.file import File as FileRecord
 from app.routes.auth_routes import get_current_user_info
 from app.schemas.candidate_schemas import ApplicationCreate, CandidateProfileUpdate
+from app.services.ml_service import compute_matches, build_candidate_text
 
 router = APIRouter(prefix="/api/dashboard", tags=["Candidate Dashboard"])
 
@@ -175,6 +176,8 @@ def get_candidate_overview(
             JobListing.id,
             JobListing.title,
             JobListing.description,
+            JobListing.requirements,
+            JobListing.skills_required,
             JobListing.location,
             JobListing.job_type,
             JobListing.salary,
@@ -286,6 +289,8 @@ def get_all_jobs(
             JobListing.id,
             JobListing.title,
             JobListing.description,
+            JobListing.requirements,
+            JobListing.skills_required,
             JobListing.location,
             JobListing.job_type,
             JobListing.salary,
@@ -475,3 +480,74 @@ def toggle_saved_job(
     db.add(SavedJob(candidate_id=candidate.id, job_id=job_id))
     db.commit()
     return {"saved": True}
+
+
+# ─── GET /candidate/matches/{user_id} ────────────────────────────────────────
+
+@router.get("/candidate/matches/{user_id}")
+def get_candidate_matches(
+    user_id: int,
+    db: Session = Depends(get_db),
+    current_user: dict = Depends(get_current_user_info),
+):
+    """
+    SBERT semantic job matching endpoint.
+
+    Flow:
+      1. Load the candidate's profile.
+      2. Check that enough semantic text exists to produce meaningful embeddings.
+      3. Load all active jobs (with company name) in one query.
+      4. Call ml_service.compute_matches() which encodes, scores, and upserts results.
+      5. Enrich each match with applicant count, saved status, and company name.
+      6. Return the ranked list ordered by cosine similarity descending.
+    """
+    _require_candidate(current_user)
+    if current_user["user_id"] != user_id:
+        raise HTTPException(status_code=403, detail="Access denied")
+
+    candidate = _get_candidate_or_404(db, user_id)
+
+    # If the profile has no semantic text, skip embedding entirely
+    if not build_candidate_text(candidate).strip():
+        return {"matches": [], "incomplete_profile": True}
+
+    # Load active jobs together with their company name in one query
+    rows = (
+        db.query(JobListing, CompanyProfile.company_name)
+        .join(CompanyProfile, JobListing.company_id == CompanyProfile.id)
+        .filter(JobListing.is_active == True)
+        .all()
+    )
+    jobs = [r[0] for r in rows]
+    company_name_map: dict[int, str] = {r[0].id: r[1] for r in rows}
+
+    # Run SBERT matching — encodes, scores, and persists to ml_match_results
+    matches = compute_matches(candidate, jobs, db, top_n=10)
+
+    # Enrich with per-request data (applicant counts and saved status)
+    saved_ids = _saved_ids_for(db, candidate)
+    counts = _app_counts(db)
+
+    result = []
+    for m in matches:
+        job = m["job"]
+        score = m["cosine_similarity"]
+        result.append({
+            "id": job.id,
+            "title": job.title,
+            "description": job.description,
+            "requirements": job.requirements,
+            "skills_required": job.skills_required,
+            "location": job.location,
+            "job_type": job.job_type,
+            "salary": float(job.salary) if job.salary else None,
+            "company_name": company_name_map.get(job.id, ""),
+            "applicant_count": counts.get(job.id, 0),
+            "posted_ago": _time_ago(job.created_at),
+            "is_saved": job.id in saved_ids,
+            "cosine_similarity": round(score, 4),
+            "match_score_pct": round(score * 100),
+            "match_label": m["match_label"],
+        })
+
+    return {"matches": result, "incomplete_profile": False}

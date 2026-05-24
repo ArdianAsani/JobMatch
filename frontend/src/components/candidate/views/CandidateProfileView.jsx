@@ -62,8 +62,18 @@ const CandidateProfileView = ({ onUpdate }) => {
   const set = (key) => (val) => setForm(f => ({ ...f, [key]: val }))
 
   const handleSave = async () => {
-    setIsSaving(true)
     setError('')
+    const trimmedSummary = (form.professional_summary || '').trim()
+    const trimmedSkills = (form.skills || '').trim()
+    if (trimmedSummary && trimmedSummary.length < 30) {
+      setError('Professional summary must be at least 30 characters.')
+      return
+    }
+    if (trimmedSkills && trimmedSkills.length < 5) {
+      setError('Skills must be at least 5 characters.')
+      return
+    }
+    setIsSaving(true)
     try {
       const { name, email, profile_strength, cv_file_id, cv_filename, cv_uploaded_at, ...updatable } = form
       await axiosInstance.put('/api/dashboard/candidate/profile/update', updatable)
@@ -71,7 +81,9 @@ const CandidateProfileView = ({ onUpdate }) => {
       setIsEditing(false)
       if (onUpdate) onUpdate({ name: profile?.name, headline: form.headline })
     } catch (err) {
-      setError(err.response?.data?.detail || 'Failed to save.')
+      const detail = err.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail[0]?.msg?.replace(/^Value error, /, '') : detail
+      setError(msg || 'Failed to save.')
     } finally {
       setIsSaving(false)
     }
@@ -291,9 +303,14 @@ const CandidateProfileView = ({ onUpdate }) => {
                   style={{ minHeight: '200px' }}
                   className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 focus:border-indigo-300 transition resize-y leading-relaxed"
                 />
-                <p className="text-xs text-gray-400 mt-2">
-                  Tip: include technologies, project types, seniority, and domains you work in.
-                </p>
+                <div className="flex items-center justify-between mt-2">
+                  <p className="text-xs text-gray-400">
+                    Tip: include technologies, project types, seniority, and domains you work in.
+                  </p>
+                  <span className={`text-xs shrink-0 ml-3 ${(form.professional_summary || '').trim().length < 30 && (form.professional_summary || '').trim().length > 0 ? 'text-amber-500' : 'text-gray-300'}`}>
+                    {(form.professional_summary || '').trim().length} / 30 min
+                  </span>
+                </div>
               </div>
             ) : (
               <div>

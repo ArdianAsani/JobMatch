@@ -14,6 +14,7 @@
  *   profile       → CandidateProfileView (view + edit profil)
  */
 import { useState, useEffect } from 'react'
+import { useLocation } from 'react-router-dom'
 import { useAuth } from '../contexts/AuthContext'
 import axiosInstance from '../api/axiosInstance'
 
@@ -27,7 +28,8 @@ import CandidateProfileView from '../components/candidate/views/CandidateProfile
 
 const CandidateDashboard = () => {
   const { user, logout } = useAuth()
-  const [activeSection, setActiveSection] = useState('dashboard')
+  const location = useLocation()
+  const [activeSection, setActiveSection] = useState(location.state?.section || 'dashboard')
   const [candidateInfo, setCandidateInfo] = useState(null)
   const [isLoading, setIsLoading] = useState(true)
   const [sidebarOpen, setSidebarOpen] = useState(false)

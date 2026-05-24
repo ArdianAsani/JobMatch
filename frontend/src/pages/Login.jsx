@@ -84,7 +84,15 @@ export default function Login() {
       // login() persists tokens to localStorage AND updates React context state
       // immediately — no page refresh needed for the UI to reflect the session.
       login(data)
-      navigate(getDashboardPath(data.role))
+
+      // If a guest was browsing jobs before logging in, send them to the browse section
+      const pendingJobId = localStorage.getItem('pending_job_id')
+      if (pendingJobId && data.role === 'CANDIDATE') {
+        localStorage.removeItem('pending_job_id')
+        navigate('/candidate/dashboard', { state: { section: 'browse' } })
+      } else {
+        navigate(getDashboardPath(data.role))
+      }
     } catch (err) {
       setServerError(err.response?.data?.detail || 'Invalid email or password.')
     } finally {

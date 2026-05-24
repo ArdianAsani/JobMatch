@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react'
-import { ClipboardList, Search, Calendar, Bookmark, Check, ArrowRight, AlertCircle } from 'lucide-react'
+import { ClipboardList, Search, Calendar, Bookmark, Check, ArrowRight, AlertCircle, Sparkles } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -144,6 +144,102 @@ const ProfileCompletionCard = ({ completion, onNavigate }) => {
   )
 }
 
+// ─── AI Match label styles ────────────────────────────────────────────────────
+const MATCH_BADGE = {
+  'Excellent Match': 'bg-green-50 text-green-700 border border-green-100',
+  'Good Match':      'bg-blue-50 text-blue-700 border border-blue-100',
+  'Moderate Match':  'bg-amber-50 text-amber-700 border border-amber-100',
+  'Low Match':       'bg-gray-100 text-gray-500',
+}
+
+// ─── AI Matches Card ──────────────────────────────────────────────────────────
+const AIMatchesCard = ({ onNavigate }) => {
+  const { user } = useAuth()
+  const [matches, setMatches] = useState([])
+  const [isLoading, setIsLoading] = useState(true)
+  const [incompleteProfile, setIncompleteProfile] = useState(false)
+
+  useEffect(() => {
+    axiosInstance.get(`/api/dashboard/candidate/matches/${user.id}`)
+      .then(r => {
+        setMatches(r.data.matches || [])
+        setIncompleteProfile(r.data.incomplete_profile || false)
+      })
+      .catch(() => {})
+      .finally(() => setIsLoading(false))
+  }, [user.id])
+
+  return (
+    <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+      {/* Header */}
+      <div className="flex items-center justify-between px-6 py-4 border-b border-gray-50">
+        <div className="flex items-center gap-2">
+          <h3 className="font-bold text-gray-900">AI Job Matches</h3>
+          <span className="flex items-center gap-1 text-[11px] font-semibold text-indigo-600 bg-indigo-50 border border-indigo-100 px-2 py-0.5 rounded-full">
+            <Sparkles size={10} /> SBERT
+          </span>
+        </div>
+        <button
+          onClick={() => onNavigate('browse')}
+          className="text-xs text-indigo-600 font-semibold hover:underline flex items-center gap-1"
+        >
+          Browse all <ArrowRight size={12} />
+        </button>
+      </div>
+
+      {/* Body */}
+      {isLoading ? (
+        <div className="px-6 py-10 text-center text-sm text-gray-400 animate-pulse">
+          Analysing your profile...
+        </div>
+      ) : incompleteProfile ? (
+        <div className="px-6 py-10 text-center">
+          <Sparkles size={20} className="text-indigo-200 mx-auto mb-2" />
+          <p className="text-sm text-gray-500 font-medium">Complete your profile to unlock AI matching.</p>
+          <p className="text-xs text-gray-400 mt-1">Add a headline, professional summary, and skills.</p>
+          <button
+            onClick={() => onNavigate('profile')}
+            className="mt-4 text-xs text-indigo-600 font-semibold hover:underline"
+          >
+            Go to profile →
+          </button>
+        </div>
+      ) : matches.length === 0 ? (
+        <div className="px-6 py-10 text-center text-sm text-gray-400">
+          No active job listings available right now.
+        </div>
+      ) : (
+        <div className="divide-y divide-gray-50">
+          {matches.map(job => (
+            <div key={job.id} className="px-6 py-4 flex items-center gap-4">
+              {/* Company avatar */}
+              <div className={`h-9 w-9 rounded-xl flex items-center justify-center text-white text-xs font-bold shrink-0 ${avatarColor(job.company_name)}`}>
+                {companyInitials(job.company_name)}
+              </div>
+
+              {/* Job info */}
+              <div className="flex-1 min-w-0">
+                <p className="font-semibold text-sm text-gray-900 truncate">{job.title}</p>
+                <p className="text-xs text-gray-400 truncate">
+                  {job.company_name}{job.location ? ` · ${job.location}` : ''}
+                </p>
+              </div>
+
+              {/* Match score */}
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-sm font-bold text-gray-800">{job.match_score_pct}%</span>
+                <span className={`text-[11px] font-semibold px-2.5 py-0.5 rounded-full whitespace-nowrap ${MATCH_BADGE[job.match_label] || MATCH_BADGE['Low Match']}`}>
+                  {job.match_label}
+                </span>
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  )
+}
+
 // ─── Main Overview ────────────────────────────────────────────────────────────
 const CandidateOverview = ({ onNavigate }) => {
   const { user } = useAuth()
@@ -208,6 +304,9 @@ const CandidateOverview = ({ onNavigate }) => {
       {completion && (
         <ProfileCompletionCard completion={completion} onNavigate={onNavigate} />
       )}
+
+      {/* AI Job Matches */}
+      <AIMatchesCard onNavigate={onNavigate} />
 
       {/* Application Status */}
       <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

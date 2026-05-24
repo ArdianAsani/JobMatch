@@ -3,7 +3,7 @@ Skemat Pydantic për modulin e kompanisë.
   - Input schemas  (Create / Update) — validojnë të dhënat hyrëse nga frontend-i
   - Response schemas (Read)          — strukturojnë të dhënat dalëse nga API-ja
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional, List
 
 
@@ -20,6 +20,13 @@ class JobCreate(BaseModel):
     skills_required: Optional[str] = None
     deadline: Optional[str] = None        # Format ISO: YYYY-MM-DD
 
+    @field_validator('description')
+    @classmethod
+    def description_min_length(cls, v):
+        if len(v.strip()) < 50:
+            raise ValueError('Job description must be at least 50 characters')
+        return v
+
 
 class JobUpdate(BaseModel):
     """Modifikim i pjesshëm i shpalljes — çdo fushë është opsionale (PATCH-style)."""
@@ -31,6 +38,13 @@ class JobUpdate(BaseModel):
     requirements: Optional[str] = None
     skills_required: Optional[str] = None
     deadline: Optional[str] = None
+
+    @field_validator('description')
+    @classmethod
+    def description_min_length(cls, v):
+        if v is not None and v.strip() and len(v.strip()) < 50:
+            raise ValueError('Job description must be at least 50 characters')
+        return v
 
 
 class CompanyProfileUpdate(BaseModel):

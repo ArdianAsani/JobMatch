@@ -3,7 +3,7 @@ Skemat Pydantic për modulin e kandidatit.
   - Input schemas  (Create/Update) — validojnë të dhënat hyrëse nga frontend-i
   - Response schemas (Read)        — strukturojnë të dhënat dalëse nga API-ja
 """
-from pydantic import BaseModel
+from pydantic import BaseModel, field_validator
 from typing import Optional
 
 
@@ -23,6 +23,20 @@ class CandidateProfileUpdate(BaseModel):
     location: Optional[str] = None
     linkedin_url: Optional[str] = None
 
+    @field_validator('professional_summary')
+    @classmethod
+    def summary_min_length(cls, v):
+        if v is not None and v.strip() and len(v.strip()) < 30:
+            raise ValueError('Professional summary must be at least 30 characters')
+        return v
+
+    @field_validator('skills')
+    @classmethod
+    def skills_min_length(cls, v):
+        if v is not None and v.strip() and len(v.strip()) < 5:
+            raise ValueError('Skills must be at least 5 characters')
+        return v
+
 
 # ─── RESPONSE SCHEMAS ─────────────────────────────────────────────────────────
 
@@ -30,6 +44,8 @@ class JobOut(BaseModel):
     id: int
     title: str
     description: str
+    requirements: Optional[str] = None
+    skills_required: Optional[str] = None
     location: Optional[str] = None
     job_type: Optional[str] = None
     salary: Optional[float] = None

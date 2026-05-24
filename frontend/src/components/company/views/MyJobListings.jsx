@@ -134,7 +134,7 @@ const MyJobListings = () => {
                   <td className="px-6 py-4 text-gray-500">{job.location || '—'}</td>
                   <td className="px-6 py-4 text-gray-500">{job.job_type || '—'}</td>
                   <td className="px-6 py-4 text-gray-500">
-                    {job.salary ? `$${Number(job.salary).toLocaleString()}` : '—'}
+                    {job.salary ? `$${Number(job.salary).toLocaleString()}/mo` : '—'}
                   </td>
                   <td className="px-6 py-4">
                     <span className="font-semibold text-gray-800">{job.applicant_count}</span>

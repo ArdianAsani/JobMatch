@@ -23,8 +23,12 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    setIsLoading(true)
     setError('')
+    if (form.description.trim().length < 50) {
+      setError('Job description must be at least 50 characters.')
+      return
+    }
+    setIsLoading(true)
     try {
       const payload = {
         ...form,
@@ -39,7 +43,9 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
       onSuccess()
       onClose()
     } catch (err) {
-      setError(err.response?.data?.detail || 'Action failed. Please try again.')
+      const detail = err.response?.data?.detail
+      const msg = Array.isArray(detail) ? detail[0]?.msg?.replace(/^Value error, /, '') : detail
+      setError(msg || 'Action failed. Please try again.')
     } finally {
       setIsLoading(false)
     }
@@ -102,7 +108,7 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
           {/* Salary + Deadline */}
           <div className="grid grid-cols-2 gap-3">
             <div>
-              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Salary (USD/yr)</label>
+              <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Salary (USD/mo)</label>
               <input
                 type="number"
                 placeholder="e.g. 85000"
@@ -136,9 +142,12 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
               onChange={set('description')}
               className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-3 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition resize-y leading-relaxed"
             />
-            <p className="text-xs text-gray-400 mt-1.5">
-              A detailed description improves the quality of AI candidate matching.
-            </p>
+            <div className="flex items-center justify-between mt-1.5">
+              <p className="text-xs text-gray-400">A detailed description improves the quality of AI candidate matching.</p>
+              <span className={`text-xs shrink-0 ml-3 ${form.description.trim().length < 50 && form.description.trim().length > 0 ? 'text-amber-500' : 'text-gray-300'}`}>
+                {form.description.trim().length} / 50 min
+              </span>
+            </div>
           </div>
 
           {/* Requirements */}

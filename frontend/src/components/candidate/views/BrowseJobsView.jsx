@@ -1,6 +1,7 @@
 import { useState, useEffect, useCallback } from 'react'
 import { MapPin, Briefcase, Bookmark, ChevronDown, AlertTriangle, CheckCircle } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
+import { useAuth } from '../../../contexts/AuthContext'
 
 const AVATAR_COLORS = [
   'bg-purple-600', 'bg-blue-600', 'bg-teal-600', 'bg-rose-500',
@@ -25,38 +26,58 @@ const CATEGORY_KEYWORDS = {
 
 const formatSalary = (salary) => {
   if (!salary) return null
-  const k = Math.round(salary / 1000)
-  return `$${k}k/yr`
+  return `$${Math.round(salary).toLocaleString()}/mo`
 }
 
-const JobCard = ({ job, onApply, onToggleSave }) => {
+const MATCH_BADGE_CLS = {
+  'Excellent Match': 'bg-green-50 text-green-700',
+  'Good Match':      'bg-blue-50 text-blue-700',
+  'Moderate Match':  'bg-amber-50 text-amber-700',
+}
+
+const JobCard = ({ job, onApply, onToggleSave, matchInfo }) => {
   const initials = companyInitials(job.company_name)
   const color = avatarColor(job.company_name)
   const isRemote = job.job_type === 'Remote' || (job.location || '').toLowerCase().includes('remote')
+  const skills = (job.skills_required || '').split(',').map(s => s.trim()).filter(Boolean).slice(0, 3)
+  const showMatch = matchInfo && matchInfo.match_score_pct >= 45
 
   return (
     <div className="bg-white rounded-2xl p-5 border border-gray-100 shadow-sm hover:shadow-md transition-all flex flex-col">
+
+      {/* Header: avatar + title + bookmark + AI match */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3">
+        <div className="flex items-center gap-3 min-w-0">
           <div className={`h-10 w-10 ${color} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0`}>
             {initials}
           </div>
-          <div>
-            <h3 className="font-bold text-gray-900 text-sm leading-tight">{job.title}</h3>
+          <div className="min-w-0">
+            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate">{job.title}</h3>
             <p className="text-xs text-gray-500 mt-0.5">{job.company_name}</p>
           </div>
         </div>
-        <button
-          onClick={() => onToggleSave(job.id)}
-          className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-gray-50 transition"
-        >
-          <Bookmark
-            size={15}
-            className={job.is_saved ? 'text-indigo-500 fill-indigo-500' : 'text-gray-300'}
-          />
-        </button>
+        <div className="flex flex-col items-end gap-1.5 shrink-0 ml-2">
+          <button
+            onClick={() => onToggleSave(job.id)}
+            className="h-7 w-7 flex items-center justify-center rounded-lg hover:bg-gray-50 transition"
+          >
+            <Bookmark
+              size={15}
+              className={job.is_saved ? 'text-indigo-500 fill-indigo-500' : 'text-gray-300'}
+            />
+          </button>
+          {showMatch && (
+            <div className="flex flex-col items-end gap-0.5">
+              <span className="text-xs font-bold text-indigo-600">{matchInfo.match_score_pct}% match</span>
+              <span className={`text-[10px] font-semibold px-1.5 py-0.5 rounded-full ${MATCH_BADGE_CLS[matchInfo.match_label] || 'bg-gray-100 text-gray-500'}`}>
+                {matchInfo.match_label}
+              </span>
+            </div>
+          )}
+        </div>
       </div>
 
+      {/* Location / type pills */}
       <div className="flex flex-wrap gap-1.5 mb-3">
         {job.location && (
           <span className="flex items-center gap-1 text-xs text-gray-500">
@@ -73,10 +94,28 @@ const JobCard = ({ job, onApply, onToggleSave }) => {
         )}
       </div>
 
+      {/* Description preview — max 2 lines */}
+      {job.description && (
+        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">{job.description}</p>
+      )}
+
+      {/* Skills chips — top 3 */}
+      {skills.length > 0 && (
+        <div className="flex flex-wrap gap-1 mb-3">
+          {skills.map(skill => (
+            <span key={skill} className="text-[10px] bg-gray-100 text-gray-600 px-2 py-0.5 rounded-md font-medium">
+              {skill}
+            </span>
+          ))}
+        </div>
+      )}
+
+      {/* Salary */}
       {formatSalary(job.salary) && (
         <p className="text-sm font-bold text-gray-800 mb-3">{formatSalary(job.salary)}</p>
       )}
 
+      {/* Footer */}
       <div className="flex items-center justify-between mt-auto">
         <span className="text-xs text-gray-400">
           {job.applicant_count} applicant{job.applicant_count !== 1 ? 's' : ''}
@@ -125,7 +164,9 @@ const Toast = ({ toast }) => {
 }
 
 const BrowseJobsView = ({ onNavigate }) => {
+  const { user } = useAuth()
   const [jobs, setJobs] = useState([])
+  const [matchMap, setMatchMap] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [applyingId, setApplyingId] = useState(null)
   const [toast, setToast] = useState({ visible: false, message: '', type: 'warning' })
@@ -138,11 +179,19 @@ const BrowseJobsView = ({ onNavigate }) => {
   const fetchJobs = useCallback(async () => {
     setIsLoading(true)
     try {
-      const res = await axiosInstance.get('/api/dashboard/jobs/all')
-      setJobs(res.data)
+      const [jobsRes, matchRes] = await Promise.all([
+        axiosInstance.get('/api/dashboard/jobs/all'),
+        axiosInstance.get(`/api/dashboard/candidate/matches/${user.id}`),
+      ])
+      setJobs(jobsRes.data)
+      const map = {}
+      for (const m of (matchRes.data.matches || [])) {
+        map[m.id] = m
+      }
+      setMatchMap(map)
     } catch { /* handle silently */ }
     finally { setIsLoading(false) }
-  }, [])
+  }, [user.id])
 
   useEffect(() => { fetchJobs() }, [fetchJobs])
 
@@ -312,6 +361,7 @@ const BrowseJobsView = ({ onNavigate }) => {
               job={job}
               onApply={handleApply}
               onToggleSave={handleToggleSave}
+              matchInfo={matchMap[job.id] || null}
             />
           ))}
         </div>

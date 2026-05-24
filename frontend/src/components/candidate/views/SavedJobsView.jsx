@@ -13,7 +13,7 @@ const companyInitials = (name = '') =>
 
 const formatSalary = (salary) => {
   if (!salary) return null
-  return `$${Math.round(salary / 1000)}k/yr`
+  return `$${Math.round(salary).toLocaleString()}/mo`
 }
 
 const SavedJobsView = () => {
