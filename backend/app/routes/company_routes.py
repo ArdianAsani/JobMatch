@@ -66,7 +66,7 @@ def _time_ago(dt) -> str:
     if hasattr(dt, "replace"):
         dt = dt.replace(tzinfo=None)
     diff = now - dt
-    days = diff.days
+    days = max(0, diff.days)
     if days == 0:
         return "Today"
     if days == 1:

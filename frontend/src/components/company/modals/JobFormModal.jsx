@@ -3,6 +3,7 @@ import { X } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 
 const JOB_TYPES = ['Full-time', 'Part-time', 'Remote', 'Contract', 'Internship']
+const KOSOVO_CITIES = ['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
 
 const JobFormModal = ({ job, onClose, onSuccess }) => {
   const isEdit = !!job
@@ -85,13 +86,13 @@ const JobFormModal = ({ job, onClose, onSuccess }) => {
           <div className="grid grid-cols-2 gap-3">
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Location</label>
-              <input
-                type="text"
-                placeholder="e.g. Remote"
+              <select
                 value={form.location}
                 onChange={set('location')}
-                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition"
-              />
+                className="w-full bg-gray-50 border border-gray-200 rounded-xl px-4 py-2.5 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-300 transition cursor-pointer"
+              >
+                {KOSOVO_CITIES.map(c => <option key={c}>{c}</option>)}
+              </select>
             </div>
             <div>
               <label className="text-xs font-semibold text-gray-500 uppercase tracking-wide mb-1.5 block">Job Type</label>

@@ -13,6 +13,7 @@ const companyInitials = (name = '') =>
   name.split(' ').map(w => w[0]).slice(0, 2).join('').toUpperCase()
 
 const JOB_TYPES = ['All', 'Full-time', 'Part-time', 'Remote', 'Contract', 'Internship']
+const KOSOVO_CITIES = ['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
 const CATEGORY_PILLS = ['All', 'Engineering', 'Product', 'Design', 'Data', 'Marketing']
 const SORT_OPTIONS = ['Latest', 'Salary High-Low', 'Salary Low-High']
 
@@ -292,13 +293,14 @@ const BrowseJobsView = ({ onNavigate }) => {
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Location</label>
-            <input
-              type="text"
-              placeholder="e.g. New York..."
+            <select
               value={locationFilter}
               onChange={e => setLocationFilter(e.target.value)}
-              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-200"
-            />
+              className="w-full bg-gray-50 border border-gray-200 rounded-xl px-3 py-2 text-sm text-gray-700 outline-none focus:ring-2 focus:ring-indigo-200 cursor-pointer"
+            >
+              <option value="">All Locations</option>
+              {KOSOVO_CITIES.map(c => <option key={c}>{c}</option>)}
+            </select>
           </div>
           <div>
             <label className="text-xs text-gray-400 mb-1 block">Job Type</label>

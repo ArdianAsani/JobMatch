@@ -8,6 +8,7 @@ import LandingFooter from '../components/landing/LandingFooter'
 import { useAuth } from '../contexts/AuthContext'
 
 const JOB_TYPES = ['All', 'Full-time', 'Part-time', 'Remote', 'Contract', 'Internship']
+const KOSOVO_CITIES = ['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
 
 const AVATAR_COLORS = [
   'bg-indigo-500', 'bg-violet-500', 'bg-teal-500',
@@ -166,15 +167,16 @@ export default function FindJobs() {
               />
             </div>
             <div className="hidden md:block w-px bg-gray-100 my-2" />
-            <div className="flex items-center gap-3 px-5 md:w-44 py-1">
+            <div className="flex items-center gap-3 px-5 md:w-52 py-1">
               <MapPin size={15} className="text-red-400 shrink-0" />
-              <input
-                type="text"
-                placeholder="Location"
+              <select
                 value={locationFilter}
                 onChange={e => setLocationFilter(e.target.value)}
-                className="flex-1 outline-none text-gray-700 text-sm placeholder-gray-400 py-2 bg-transparent w-full"
-              />
+                className="flex-1 outline-none text-gray-700 text-sm py-2 bg-transparent cursor-pointer"
+              >
+                <option value="">All Locations</option>
+                {KOSOVO_CITIES.map(c => <option key={c}>{c}</option>)}
+              </select>
             </div>
             <button
               onClick={() => {}}

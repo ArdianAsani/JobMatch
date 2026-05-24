@@ -5,7 +5,7 @@ from fastapi import APIRouter, Depends, HTTPException, status
 from sqlalchemy.orm import Session, joinedload
 from sqlalchemy import func
 from app.database import get_db
-from app.models import User, Role, CandidateProfile, CompanyProfile, JobListing, Application
+from app.models import User, Role, CandidateProfile, CompanyProfile, JobListing, Application, SavedJob, MLMatchResult
 from app.routes.auth_routes import get_current_user_info
 from app.schemas.admin_schemas import (
     AdminStatsResponse,
@@ -410,7 +410,9 @@ def delete_job(
     if not job:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Job not found")
 
-    # Delete linked applications first to satisfy the FK constraint
+    # Delete all child records first to satisfy FK constraints
+    db.query(MLMatchResult).filter(MLMatchResult.job_id == job_id).delete()
+    db.query(SavedJob).filter(SavedJob.job_id == job_id).delete()
     deleted_apps = db.query(Application).filter(Application.job_id == job_id).delete()
     db.delete(job)
     db.commit()

@@ -57,7 +57,7 @@ def _time_ago(dt) -> str:
     if dt.tzinfo is None:
         dt = dt.replace(tzinfo=timezone.utc)
     diff = now - dt
-    days = diff.days
+    days = max(0, diff.days)
     if days == 0:
         return "today"
     if days == 1:

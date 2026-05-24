@@ -4,7 +4,10 @@ Skemat Pydantic për modulin e kompanisë.
   - Response schemas (Read)          — strukturojnë të dhënat dalëse nga API-ja
 """
 from pydantic import BaseModel, field_validator
-from typing import Optional, List
+from typing import Optional, List, Literal
+
+KOSOVO_CITIES = ['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
+KosovoCity = Literal['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
 
 
 # ─── INPUT SCHEMAS ────────────────────────────────────────────────────────────
@@ -13,7 +16,7 @@ class JobCreate(BaseModel):
     """Fushat e nevojshme për krijimin e një shpalljeje të re pune."""
     title: str
     description: str
-    location: str = "Prishtina"
+    location: KosovoCity = "Prishtina"
     job_type: str = "Full-time"   # Full-time | Part-time | Remote | Contract
     salary: Optional[float] = None
     requirements: Optional[str] = None
@@ -32,7 +35,7 @@ class JobUpdate(BaseModel):
     """Modifikim i pjesshëm i shpalljes — çdo fushë është opsionale (PATCH-style)."""
     title: Optional[str] = None
     description: Optional[str] = None
-    location: Optional[str] = None
+    location: Optional[KosovoCity] = None
     job_type: Optional[str] = None
     salary: Optional[float] = None
     requirements: Optional[str] = None
