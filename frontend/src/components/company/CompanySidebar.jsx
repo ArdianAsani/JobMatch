@@ -1,4 +1,4 @@
-import { LayoutDashboard, Briefcase, Users, Building2, LayoutGrid } from 'lucide-react'
+import { LayoutDashboard, Briefcase, Users, Building2, LayoutGrid, LogOut } from 'lucide-react'
 
 const NAV = [
   { key: 'dashboard',  label: 'Dashboard',       icon: LayoutDashboard },
@@ -71,8 +71,9 @@ const CompanySidebar = ({ active, onNavigate, companyInfo, logout }) => {
         </div>
         <button
           onClick={logout}
-          className="mt-3 w-full text-xs text-slate-500 hover:text-red-400 transition text-left px-1"
+          className="mt-3 flex items-center gap-2 w-full px-4 py-3 rounded-xl text-sm font-semibold text-indigo-300 hover:bg-rose-500/20 hover:text-rose-300 transition-all"
         >
+          <LogOut size={17} />
           Sign out
         </button>
       </div>

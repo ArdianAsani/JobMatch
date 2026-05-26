@@ -75,7 +75,6 @@ const JobCard = ({ job, onApply }) => {
         <div>
           {formatSalary(job.salary) && (
             <p className="text-sm font-bold text-gray-800 flex items-center gap-1">
-              <DollarSign size={13} className="text-green-500" />
               {formatSalary(job.salary)}
             </p>
           )}

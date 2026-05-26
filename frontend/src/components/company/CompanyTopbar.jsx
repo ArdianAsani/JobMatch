@@ -1,4 +1,4 @@
-import { Search, Menu } from 'lucide-react'
+import { Menu } from 'lucide-react'
 
 const CompanyTopbar = ({ companyInfo, onNavigate, onMenuToggle }) => {
   const initials = companyInfo?.name
@@ -10,15 +10,6 @@ const CompanyTopbar = ({ companyInfo, onNavigate, onMenuToggle }) => {
       <button onClick={onMenuToggle} className="lg:hidden h-9 w-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition mr-2">
         <Menu size={20} className="text-gray-500" />
       </button>
-
-      <div className="flex items-center gap-2 bg-gray-50 border border-gray-200 rounded-full px-4 py-2 w-72">
-        <Search size={15} className="text-gray-400" />
-        <input
-          type="text"
-          placeholder="Search jobs, companies..."
-          className="bg-transparent text-sm text-gray-600 outline-none placeholder-gray-400 w-full"
-        />
-      </div>
 
       <button
         onClick={() => onNavigate('profile')}

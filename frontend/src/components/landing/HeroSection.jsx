@@ -1,5 +1,8 @@
 import { useState } from 'react'
 import { useNavigate } from 'react-router-dom'
+import { MapPin } from 'lucide-react'
+
+const KOSOVO_CITIES = ['Prishtina', 'Prizreni', 'Peja', 'Gjakova', 'Gjilani', 'Mitrovica', 'Ferizaj']
 
 function SearchIcon({ className }) {
   return (
@@ -32,13 +35,6 @@ export default function HeroSection() {
       <div className="absolute right-1/3 bottom-0 w-52 h-52 rounded-full bg-indigo-100 opacity-30" />
 
       <div className="relative z-10 max-w-4xl mx-auto px-6 text-center">
-        {/* Badge */}
-        <div className="inline-flex items-center gap-2 bg-white border border-indigo-100 rounded-full px-4 py-2 mb-8 shadow-sm">
-          <span className="text-orange-500 text-sm">⚡</span>
-          <span className="text-sm text-gray-600 font-medium">
-            Digital Recruitment Platform for Candidates and Companies
-          </span>
-        </div>
 
         {/* Headline */}
         <h1 className="text-5xl md:text-6xl font-extrabold text-gray-900 leading-tight mb-6">
@@ -67,15 +63,15 @@ export default function HeroSection() {
           </div>
           <div className="hidden md:block w-px bg-gray-200 my-2" />
           <div className="flex items-center gap-3 px-4 md:w-44 py-1">
-            <span className="text-red-400 text-base shrink-0">📍</span>
-            <input
-              type="text"
-              placeholder="Location"
-              className="flex-1 outline-none text-gray-600 text-sm placeholder-gray-400 py-2 w-full"
+            <MapPin size={15} className="text-red-400 shrink-0" />
+            <select
               value={location}
               onChange={e => setLocation(e.target.value)}
-              onKeyDown={handleKey}
-            />
+              className="flex-1 outline-none text-gray-700 text-sm py-2 bg-transparent cursor-pointer"
+            >
+              <option value="">All Locations</option>
+              {KOSOVO_CITIES.map(c => <option key={c}>{c}</option>)}
+            </select>
           </div>
           <button
             onClick={handleSearch}
