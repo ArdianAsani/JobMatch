@@ -1,5 +1,5 @@
 import { useState, useEffect, useCallback } from 'react'
-import { MapPin, Briefcase, Bookmark, ChevronDown, AlertTriangle, CheckCircle } from 'lucide-react'
+import { MapPin, Briefcase, Bookmark, ChevronDown, AlertTriangle, CheckCircle, X, DollarSign, Clock, Users, FileText, Star } from 'lucide-react'
 import axiosInstance from '../../../api/axiosInstance'
 import { useAuth } from '../../../contexts/AuthContext'
 
@@ -36,7 +36,164 @@ const MATCH_BADGE_CLS = {
   'Moderate Match':  'bg-amber-50 text-amber-700',
 }
 
-const JobCard = ({ job, onApply, onToggleSave, matchInfo }) => {
+// ─── Job Detail Modal ─────────────────────────────────────────────────────────
+const JobDetailModal = ({ job, matchInfo, onClose, onApply, onToggleSave }) => {
+  const color = avatarColor(job.company_name)
+  const initials = companyInitials(job.company_name)
+  const skills = (job.skills_required || '').split(',').map(s => s.trim()).filter(Boolean)
+  const requirements = (job.requirements || '').split('\n').filter(Boolean)
+  const showMatch = matchInfo && matchInfo.match_score_pct >= 45
+  const isRemote = job.job_type === 'Remote' || (job.location || '').toLowerCase().includes('remote')
+
+  // Close on backdrop click
+  const handleBackdrop = (e) => { if (e.target === e.currentTarget) onClose() }
+
+  // Close on Escape
+  useEffect(() => {
+    const onKey = (e) => { if (e.key === 'Escape') onClose() }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [onClose])
+
+  return (
+    <div
+      className="fixed inset-0 bg-black/40 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      onClick={handleBackdrop}
+    >
+      <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl border border-gray-100 flex flex-col max-h-[90vh]">
+
+        {/* ── Header ── */}
+        <div className="flex items-start justify-between px-7 pt-7 pb-5 border-b border-gray-100 shrink-0">
+          <div className="flex items-center gap-4">
+            <div className={`h-14 w-14 ${color} rounded-2xl flex items-center justify-center text-white font-bold text-base shrink-0`}>
+              {initials}
+            </div>
+            <div>
+              <h2 className="text-lg font-bold text-gray-900 leading-tight">{job.title}</h2>
+              <p className="text-sm text-gray-500 mt-0.5">{job.company_name}</p>
+              {showMatch && (
+                <div className="flex items-center gap-2 mt-1.5">
+                  <Star size={12} className="text-indigo-500 fill-indigo-500" />
+                  <span className="text-xs font-bold text-indigo-600">{matchInfo.match_score_pct}% match</span>
+                  <span className={`text-[11px] font-semibold px-2 py-0.5 rounded-full ${MATCH_BADGE_CLS[matchInfo.match_label] || 'bg-gray-100 text-gray-500'}`}>
+                    {matchInfo.match_label}
+                  </span>
+                </div>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={onClose}
+            className="h-9 w-9 flex items-center justify-center rounded-xl hover:bg-gray-100 transition shrink-0 ml-4"
+          >
+            <X size={18} className="text-gray-400" />
+          </button>
+        </div>
+
+        {/* ── Meta badges ── */}
+        <div className="flex flex-wrap gap-2 px-7 py-4 border-b border-gray-50 shrink-0">
+          {job.location && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-gray-600 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+              <MapPin size={12} className="text-gray-400" /> {job.location}
+            </span>
+          )}
+          {job.job_type && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-indigo-600 bg-indigo-50 border border-indigo-100 rounded-full px-3 py-1.5">
+              <Briefcase size={12} /> {job.job_type}
+            </span>
+          )}
+          {isRemote && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-green-600 bg-green-50 border border-green-100 rounded-full px-3 py-1.5 font-semibold">
+              Remote
+            </span>
+          )}
+          {formatSalary(job.salary) && (
+            <span className="inline-flex items-center gap-1.5 text-xs text-emerald-700 bg-emerald-50 border border-emerald-100 rounded-full px-3 py-1.5 font-semibold">
+              <DollarSign size={12} /> {formatSalary(job.salary)}
+            </span>
+          )}
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5 ml-auto">
+            <Clock size={11} /> Posted {job.posted_ago}
+          </span>
+          <span className="inline-flex items-center gap-1.5 text-xs text-gray-500 bg-gray-50 border border-gray-200 rounded-full px-3 py-1.5">
+            <Users size={11} /> {job.applicant_count} applicant{job.applicant_count !== 1 ? 's' : ''}
+          </span>
+        </div>
+
+        {/* ── Scrollable body ── */}
+        <div className="overflow-y-auto px-7 py-5 space-y-6 flex-1">
+
+          {/* Description */}
+          {job.description && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2.5 flex items-center gap-2">
+                <FileText size={12} /> About the Role
+              </h4>
+              <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{job.description}</p>
+            </div>
+          )}
+
+          {/* Requirements */}
+          {job.requirements && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2.5">Requirements</h4>
+              {requirements.length > 1 ? (
+                <ul className="space-y-1.5">
+                  {requirements.map((req, i) => (
+                    <li key={i} className="flex items-start gap-2 text-sm text-gray-700">
+                      <span className="mt-1.5 h-1.5 w-1.5 rounded-full bg-indigo-400 shrink-0" />
+                      {req}
+                    </li>
+                  ))}
+                </ul>
+              ) : (
+                <p className="text-sm text-gray-700 leading-relaxed whitespace-pre-line">{job.requirements}</p>
+              )}
+            </div>
+          )}
+
+          {/* Skills */}
+          {skills.length > 0 && (
+            <div>
+              <h4 className="text-xs font-bold text-gray-400 uppercase tracking-widest mb-2.5">Skills Required</h4>
+              <div className="flex flex-wrap gap-2">
+                {skills.map(skill => (
+                  <span key={skill} className="text-xs bg-indigo-50 text-indigo-700 border border-indigo-100 px-3 py-1 rounded-full font-medium">
+                    {skill}
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+        </div>
+
+        {/* ── Footer actions ── */}
+        <div className="flex items-center justify-between px-7 py-5 border-t border-gray-100 bg-gray-50/60 rounded-b-3xl shrink-0">
+          <button
+            onClick={() => { onToggleSave(job.id); }}
+            className={`flex items-center gap-2 text-sm font-semibold px-4 py-2.5 rounded-xl border transition ${
+              job.is_saved
+                ? 'border-indigo-200 bg-indigo-50 text-indigo-600'
+                : 'border-gray-200 bg-white text-gray-600 hover:border-indigo-200 hover:text-indigo-600'
+            }`}
+          >
+            <Bookmark size={15} className={job.is_saved ? 'fill-indigo-500 text-indigo-500' : ''} />
+            {job.is_saved ? 'Saved' : 'Save Job'}
+          </button>
+          <button
+            onClick={() => { onApply(job.id); onClose(); }}
+            className="bg-indigo-600 text-white text-sm font-semibold px-7 py-2.5 rounded-xl hover:bg-indigo-700 active:scale-95 transition-all shadow-sm shadow-indigo-200"
+          >
+            Apply Now
+          </button>
+        </div>
+      </div>
+    </div>
+  )
+}
+
+// ─── Job Card ─────────────────────────────────────────────────────────────────
+const JobCard = ({ job, onApply, onToggleSave, matchInfo, onViewDetails }) => {
   const initials = companyInitials(job.company_name)
   const color = avatarColor(job.company_name)
   const isRemote = job.job_type === 'Remote' || (job.location || '').toLowerCase().includes('remote')
@@ -48,12 +205,15 @@ const JobCard = ({ job, onApply, onToggleSave, matchInfo }) => {
 
       {/* Header: avatar + title + bookmark + AI match */}
       <div className="flex items-start justify-between mb-3">
-        <div className="flex items-center gap-3 min-w-0">
+        <div
+          className="flex items-center gap-3 min-w-0 cursor-pointer group"
+          onClick={() => onViewDetails(job)}
+        >
           <div className={`h-10 w-10 ${color} rounded-xl flex items-center justify-center text-white font-bold text-sm shrink-0`}>
             {initials}
           </div>
           <div className="min-w-0">
-            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate">{job.title}</h3>
+            <h3 className="font-bold text-gray-900 text-sm leading-tight truncate group-hover:text-indigo-600 transition-colors">{job.title}</h3>
             <p className="text-xs text-gray-500 mt-0.5">{job.company_name}</p>
           </div>
         </div>
@@ -97,7 +257,12 @@ const JobCard = ({ job, onApply, onToggleSave, matchInfo }) => {
 
       {/* Description preview — max 2 lines */}
       {job.description && (
-        <p className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed">{job.description}</p>
+        <p
+          className="text-xs text-gray-500 line-clamp-2 mb-3 leading-relaxed cursor-pointer hover:text-gray-700 transition-colors"
+          onClick={() => onViewDetails(job)}
+        >
+          {job.description}
+        </p>
       )}
 
       {/* Skills chips — top 3 */}
@@ -118,9 +283,12 @@ const JobCard = ({ job, onApply, onToggleSave, matchInfo }) => {
 
       {/* Footer */}
       <div className="flex items-center justify-between mt-auto">
-        <span className="text-xs text-gray-400">
-          {job.applicant_count} applicant{job.applicant_count !== 1 ? 's' : ''}
-        </span>
+        <button
+          onClick={() => onViewDetails(job)}
+          className="text-xs text-indigo-600 font-semibold hover:underline"
+        >
+          View Details
+        </button>
         <button
           onClick={() => onApply(job.id)}
           className="bg-indigo-600 text-white text-xs font-semibold px-4 py-1.5 rounded-full hover:bg-indigo-700 transition"
@@ -170,6 +338,7 @@ const BrowseJobsView = ({ onNavigate }) => {
   const [matchMap, setMatchMap] = useState({})
   const [isLoading, setIsLoading] = useState(true)
   const [applyingId, setApplyingId] = useState(null)
+  const [selectedJob, setSelectedJob] = useState(null)
   const [toast, setToast] = useState({ visible: false, message: '', type: 'warning' })
   const [search, setSearch] = useState('')
   const [locationFilter, setLocationFilter] = useState('')
@@ -225,6 +394,7 @@ const BrowseJobsView = ({ onNavigate }) => {
     try {
       const res = await axiosInstance.post(`/api/dashboard/saved-jobs/toggle/${jobId}`)
       setJobs(prev => prev.map(j => j.id === jobId ? { ...j, is_saved: res.data.saved } : j))
+      setSelectedJob(prev => prev?.id === jobId ? { ...prev, is_saved: res.data.saved } : prev)
     } catch { /* silently fail */ }
   }
 
@@ -257,6 +427,16 @@ const BrowseJobsView = ({ onNavigate }) => {
   return (
     <div className="space-y-5">
       <Toast toast={toast} />
+
+      {selectedJob && (
+        <JobDetailModal
+          job={selectedJob}
+          matchInfo={matchMap[selectedJob.id] || null}
+          onClose={() => setSelectedJob(null)}
+          onApply={handleApply}
+          onToggleSave={handleToggleSave}
+        />
+      )}
 
       <div className="flex items-center justify-between">
         <div>
@@ -364,6 +544,7 @@ const BrowseJobsView = ({ onNavigate }) => {
               onApply={handleApply}
               onToggleSave={handleToggleSave}
               matchInfo={matchMap[job.id] || null}
+              onViewDetails={setSelectedJob}
             />
           ))}
         </div>
