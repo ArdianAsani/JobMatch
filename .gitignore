@@ -216,3 +216,6 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# Local ML model weights — populated by running backend/setup_model.py
+backend/app/ml/

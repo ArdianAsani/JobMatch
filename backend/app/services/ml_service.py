@@ -4,7 +4,7 @@ ml_service.py — SBERT semantic job matching service.
 End-to-end flow:
   1. Build a single text string for the candidate  (headline + summary + skills)
   2. Build a single text string for each active job (title + description + requirements + skills_required)
-  3. Encode all texts into dense sentence embeddings via SBERT (all-MiniLM-L6-v2)
+  3. Encode all texts into dense sentence embeddings via SBERT (paraphrase-multilingual-MiniLM-L12-v2)
   4. Compute cosine similarity between the candidate vector and every job vector
   5. Persist each score into ml_match_results (upsert — one row per candidate/job pair)
   6. Return the top-N jobs sorted by descending similarity
@@ -15,6 +15,7 @@ Swap MODEL_NAME to use a fine-tuned model without changing any other code.
 
 from __future__ import annotations
 
+import os
 from datetime import datetime, timezone
 
 import numpy as np
@@ -28,7 +29,13 @@ from app.models.ml_match_result import MLMatchResult
 
 # ─── Configuration ────────────────────────────────────────────────────────────
 
-MODEL_NAME = "all-MiniLM-L6-v2"
+MODEL_NAME = "paraphrase-multilingual-MiniLM-L12-v2"
+
+# Absolute path to the locally saved model directory (backend/app/ml/<MODEL_NAME>).
+# Run backend/setup_model.py once to populate this directory before starting the server.
+_MODEL_LOCAL_PATH = os.path.abspath(
+    os.path.join(os.path.dirname(__file__), "..", "ml", MODEL_NAME)
+)
 
 # Checked top-to-bottom; first threshold that the score meets wins.
 MATCH_THRESHOLDS: list[tuple[float, str]] = [
@@ -48,13 +55,13 @@ def _get_model() -> SentenceTransformer:
     """
     Return the cached SBERT model, loading it on first call.
 
-    The model (~80 MB) is downloaded from HuggingFace on the very first run
-    and then cached locally by sentence-transformers. Subsequent starts load
-    from the local cache instantly.
+    Loads from the local directory at backend/app/ml/<MODEL_NAME> — no internet
+    required. Run backend/setup_model.py once to download and save the model
+    before starting the server for the first time.
     """
     global _model
     if _model is None:
-        _model = SentenceTransformer(MODEL_NAME)
+        _model = SentenceTransformer(_MODEL_LOCAL_PATH)
     return _model
 
 
